@@ -1,0 +1,45 @@
+{
+  "name": "virtual-discussion",
+  "version": "0.1.0",
+  "description": "Virtual Discussion is a Collabrative work and discussion room where presenter can share videos, write up code, draw, chat and many more things from one screen. It uses Basic VueJS structure for clint side interface and NodeJS for handling things on back screen. ",
+  "main": "./server/index.js",
+  "scripts": {
+    "test": "mocha --reporter spec",
+    "start": "node ./server/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amitrana-dev/virtual-discussion.git"
+  },
+  "keywords": [
+    "Virtual",
+    "Discussion",
+    "Collaborative",
+    "sketch"
+  ],
+  "author": "Ammy T",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/amitrana-dev/virtual-discussion/issues"
+  },
+  "homepage": "https://github.com/amitrana-dev/virtual-discussion#readme",
+  "dependencies": {
+    "bootstrap": "^4.1.3",
+    "browserify": "^16.2.3",
+    "bufferutil": "^4.0.0",
+    "crel": "^3.1.0",
+    "md5": "^2.2.1",
+    "moment": "^2.22.2",
+    "momentjs": "^2.0.0",
+    "mysql": "^2.16.0",
+    "redis": "^2.8.0",
+    "socket.io": "^2.1.1",
+    "socket.io-client": "^2.1.1",
+    "socket.io-redis": "^5.2.0",
+    "sticky-session": "^1.1.2",
+    "uws": "^99.0.0",
+    "vue-toasted": "^1.1.26",
+    "vue2-notify": "^1.4.0",
+    "websocket": "^1.0.28"
+  }
+}

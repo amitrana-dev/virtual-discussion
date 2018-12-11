@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.4.2/css/all.css" integrity="sha384-/rXc/GQVaYpyDdyxK+ecHPVYJSN9bmVFBvjA/9eOB+pb3F2w2N6fc5qB9Ew5yIns" crossorigin="anonymous">
+    <link rel="stylesheet" href="css/custom.css" />
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js" defer></script>
+    <script src="js/vue-toasted.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.1/ace.js" defer></script>
+
+    <script src="js/vendors.js" defer></script>
+    <script src="js/rtc-conn.js"></script>
+    <title>Virtual Discussion</title>
+    <!-- User "token" and "discussion id" will be replaced by query params with same key if exist -->
+    <meta key="token" value="HF7646546KUVMY" />
+    <meta key="discussion_id" value="hail_lucifer" />
+  </head>
+  <body>
+    <div id="discussion_board" class="container-fluid">
+       <div class="d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm nav-bar header-bar">
+        <h5 class="my-0 mr-md-auto font-weight-normal">Virtual Discussion on {{course.title}}</h5>
+        <nav class="my-2 my-md-0 mr-md-5" id="media-controls">
+          <a class="p-2 text-dark fa" href="javascript:void(0)" title="Record Session" id="toggleRecording" @click="toggleRecording"><i class="fa fa-circle" :class="{'text-danger': isRecordingAvailable}"></i> REC</a>
+          <a class="p-2 fa" href="javascript:void(0)" title="Toggle Video" id="toggleVideo" @click="toggleVideo" :class="{'text-danger': isVidAvailable,'text-dark': !isVidAvailable}"><i class="fa" :class="{'fa-video': isVidAvailable,'fa-video-slash': !isVidAvailable}"></i></a>
+          <a class="p-2 fa" href="javascript:void(0)" title="Toggle Audio" id="toggleAudio" @click="toggleAudio"  :class="{'text-danger': isAudioAvailable,'text-dark': !isAudioAvailable}"><i class="fa" :class="{'fa-microphone': isAudioAvailable,'fa-microphone-slash': !isAudioAvailable}"></i></a>
+        </nav>
+        <nav class="my-2 my-md-0 mr-md-3">
+          <a class="p-2 text-dark fa" title="Time Record" href="javascript:void(0)">
+            <svg class="nav-time-record" width="25" height="25" viewbox="0 0 250 250">
+              <circle cx="125" cy="125" r="120" stroke="black" stroke-width="2" fill="none" />
+              <path :d="drawRemainingTime(25)" stroke="black" transform="translate(125, 125) scale(.84)"/>
+            </svg>
+          </a>
+          <a class="p-2 text-dark fa" href="javascript:void(0)" title="Toggle Layout"><i class="fa fa-columns"></i></a>
+          <div class="dropdowns-wrapper">
+            <div class="dropdown-container">
+              <div class="notifications dropdown dd-trigger" @click="showNotification=!showNotification">
+                <span class="count animated" id="notifications-count">{{totalParticipants}}</span>
+                <span class="fa fa-users"></span>
+              </div>
+              <div class="dropdown-menu animated p-0" :class="{'fadeOutUp': !showNotification,'fadeInDown': showNotification,'d-block': showNotification}">
+                <div class="dropdown-header">
+                  <span class="triangle"></span>
+                  <span class="heading">Paticipants</span>
+                  <span class="count" id="dd-notifications-count">{{totalParticipants}}</span>
+                </div>
+                <div class="dropdown-body">
+                  <div class="notification new" v-for="user in participants" @click="chatWith(user.identity)">
+                    <div class="notification-image-wrapper">
+                      <div class="notification-image">
+                        <img :src="user.profileImage" alt="" width="32">
+                      </div>
+                    </div>
+                    <div class="notification-text">
+                       <span class="highlight">{{user.peerId==loggedInUser.peerId ? 'Me' : user.firstName + ' '+ user.firstName}}</span>
+                       <br>
+                       <span v-if="user.presenter" class="badge badge-success">Presenter</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <a class="p-2 text-dark fa" v-if="loggedInUser && !loggedInUser.presenter  && presenter" href="javascript:void(0)" title="Raise Hand" @click="raiseHand()"><i class="fa fa-hand-paper"></i></a>
+          <!--a class="p-2 text-dark fa" href="javascript:void(0)" title="Notifications"><i class="fa fa-bell"></i></a-->
+          <a class="ml-md-5 text-dark fa" href="javascript:void(0)" title="Toggle Fullscreen" @click="toggleFullscreen()"><i class="fa fa-expand"></i></a>
+        </nav>
+      </div>
+      <div class="d-flex flex-column flex-md-row p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm playground">
+        <div class="col-md-3 border left-sidebar col-sm-12">
+          <video-box :socket="socket" :is-vid-available="isVidAvailable" :is-audio-available="isAudioAvailable" :discussion-id="discussionId"></video-box>
+          <chat-box :socket="socket" :logged-in-user="loggedInUser" :participants="participants" ref="chatBox"></chat-box>
+        </div>
+        <div class="col-sm-12 d-xs-block mt-3 d-md-none"></div>
+        <div class="col-md-9 right-sidebar col-sm-12 px-0 px-sm-3">
+          <!-- Tabs nav started -->
+          <ul class="nav nav-tabs" id="play-menu">
+            <li class="nav-item dropdown">
+              <a class="nav-link active" data-toggle="dropdown" href="javascript:void(0)" @click="toggleMenu()" role="button" aria-haspopup="true" aria-expanded="false">New | <i class="fa fa-angle-down text-black"></i></a>
+              <div class="dropdown-menu" :class="{'d-block': showMenu,'d-none': !showMenu }">
+                <a class="dropdown-item" href="javascript:void(0)" @click="toggleModel('youtube')">Youtube</a>
+                <a class="dropdown-item" href="javascript:void(0)" @click="addItem('whiteboard')">Whiteboard</a>
+                <a class="dropdown-item" href="javascript:void(0)" @click="toggleModel('media')">Media Player</a>
+                <a class="dropdown-item" href="javascript:void(0)" @click="toggleModel('content')">Content</a>
+                <a class="dropdown-item" href="javascript:void(0)" @click="addItem('code')">Code Editor</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="javascript:void(0)">Save to PDF</a>
+              </div>
+            </li>
+            <li class="nav-item ml-1" v-for="(item,index) in contentTabs">
+              <a class="nav-link active"  :class="{'bg-primary': currentTab===item.id,'text-white': currentTab===item.id}"  href="javascript:void(0)" @click="setCurrentTab(item.id)">{{ item.name }} | <i class="fa fa-times text-black" @click="removeContainer(item.id,false,$event)"></i></a>
+            </li>
+          </ul>
+          <!-- Tabs nav ended -->
+          <!-- Tabs Body started -->
+          <div class="default-tab content-tabs position-relative" :class="{'d-block': currentTab===null,'d-none': currentTab!==null}">
+              <p>Welcome to Virtual Discussion</p>
+          </div>
+          <div v-for="(item,index) in contentTabs" class="content-tabs  position-relative" :class="{'d-block': currentTab===item.id,'d-none': currentTab!==item.id}">
+            <iframe class="youtube-player position-absolute border-0" allowfullscreen allow="autoplay" v-if="item.type==='youtube'" :youtubeId="item.id" :src="'https://www.youtube.com/embed/'+item.videoId+'?autoplay='+(currentTab===item.id ? 1 : 0)+'&controls=1'"></iframe>
+            <code-editor  v-if="item.type==='code'" :item="item" :socket="socket" :discussion-id="discussionId"></code-editor>
+          </div>
+          <!-- Tabs Body ended -->
+          <!-- Loader -->
+          <div class="modal-backdrop fade show loader" :class="{'d-block': isLoading ,'d-none': !isLoading}"><div class="position-fixed text-white loader-container"><div class="lds-ripple"><div></div><div></div></div></div></div>
+          <!-- Models started -->
+          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['youtube'],'d-none': !showItem['youtube']}">
+            <div class="modal-dialog modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">Load youtube video</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('youtube')">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <div class="input-group">
+                    <span class="input-group-prepend">
+                      <span class="input-group-text">https://www.youtube.com/watch?v=</span>
+                    </span>
+                    <input type="text" class="form-control input-sm" v-model="youtubeVideoId" v-on:keyup.13="loadVideo" id="youtube-video-id" placeholder="Video ID..." aria-label="Video ID..." aria-describedby="youtube-id-submit">
+                    <span class="input-group-append">
+                      <button class="btn btn-danger btn-sm" id="youtube-id-submit" title="Load youtube video" v-on:click="loadVideo"><i class="fab fa-youtube"></i></button>
+                    </span>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('youtube')">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-backdrop fade show" :class="{'d-block': showItem['youtube'] || showItem['media'] || showItem['content'] ,'d-none': !showItem['youtube'] && !showItem['media'] && !showItem['content']}"></div>
+          <!-- Models ended -->
+        </div>
+
+      </div>
+
+    </div>
+    <template id="moments-ago">
+      <span class="moments-ago">
+          {{timeFromNow}}
+      </span>
+    </template>
+    <template id="code-editor">
+      <div class="code-container">
+        <select v-model="chosenLang" class="language-chooser position-absolute border-0 fixed-bottom m-2" @change="changeLanguage(item.id)">
+          <option v-for="language in languages" v-bind:value="language">
+            {{ language  | capitalize}}
+          </option>
+        </select>
+        <div class="code-editor position-absolute" :id="item.id"></div>
+      </div>
+    </template>
+    <template id="message-list">
+      <ul class="chat-list">
+        <li class="left clearfix" v-for="chat in messages">
+          <span class="chat-img float-left">
+            <img v-if="chat.user.image" :src="chat.user.profileImage" :alt="chat.user.firstName + ' ' + chat.user.lastName" class="rounded" />
+            <img v-if="!chat.user.image || chat.user.image==''" src="http://placehold.it/50/55C1E7/fff&text=U" :alt="chat.user.firstName + ' ' + chat.user.lastName" class="rounded" />
+          </span>
+          <div class="chat-body clearfix">
+            <div class="header">
+              <strong class="primary-font">{{loggedInUser.identity===chat.user.identity ? 'Me' : chat.user.firstName}}</strong>
+              <small class="float-right text-muted"><span class="fa fa-clock"></span><moments-ago :date="chat.timestamp"></moments-ago></small>
+            </div>
+            <p>{{chat.message}}</p>
+          </div>
+        </li>
+      </ul>
+    </template>
+    <template id="chat-box">
+      <div class="row-fluid mt-3">
+        <div class="col-sm-12 pl-0 pr-0">
+          <h3><span class="fa fa-comment"></span> Chat</h3>
+          <div id="chatBox">
+            <div class="col-sm-12 p-0">
+              <ul class="nav nav-tabs chat-bar">
+                
+                <li class="nav-item small" :class="{'d-none': group.hideMe,'d-block': !group.hideMe}" v-for="(group,index) in messageGroups" :key="group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.identity : group.to.identity) : 'common'">
+                  <a class="nav-link active" :class="{'text-info': group.name==currentGroup}" @click="chatWith(group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.identity : group.to.identity) : 'common')">{{group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.firstName : group.to.firstName) : 'General'}}<span v-if="group.newMessage" class="new_message"></span><span v-if="group.name !=='common'"> | <i class="fa fa-times text-black" @click="removeChat(index,$event)"></i></span></a>
+                </li>
+              </ul>
+              <div class="chat-groups">
+                <message-list v-for="group in messageGroups" v-bind:messages="group.messages" :logged-in-user="loggedInUser"  :class="{'d-block': (currentGroup == group.name && !group.hideMe),'d-none': (currentGroup != group.name || group.hideMe)}" :key="group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.identity : group.to.identity) : 'common'" />
+              </div>
+            </div>
+            <div class="chat-input mb-1">
+              <div class="input-group">
+                <input type="text" v-model="chatMessage" class="form-control input-sm" v-on:keyup.13="addComment" id="chat-message" placeholder="Type your message here..." aria-label="Type your message here..." aria-describedby="chat-submit">
+                <span class="input-group-append">
+                  <button class="btn btn-primary btn-sm" id="chat-submit" v-on:click="addComment"><i class="fa fa-comment"></i></button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      <div>
+    </template>
+    <template id="video_template">
+      <div class="video_box col-4 p-1">
+        <video class="rounded mx-auto col-sm-12 pl-0 pr-0 d-block" autoplay>
+          Video unavailable
+        </video>
+        <div class="no-vid-container d-none text-white">
+          <i class="fa fa-video-slash"><br>No Video</i>
+        </div>
+        <div class="vid-controls">
+          <div class="control-container">
+            <a class="p-2 fa video-control" href="javascript:void(0)" title="Toggle Video"><i class="fa fa-video-slash"></i><i class="fa fa-video"></i></a>
+            <a class="p-2 fa audio-control" href="javascript:void(0)" title="Toggle Audio"><i class="fa fa-microphone-slash"></i><i class="fa fa-microphone"></i></a>
+          </div>
+        </div>
+      </div>
+    </template>
+    <template id="video-box">
+      <div class="row-fluid align-items-center pt-3" id="video-container">
+            <video class="rounded mx-auto col-sm-12 pl-0 pr-0" ref="videoObj" v-bind:class="{ 'd-block': isVidAvailable, 'd-none': !isVidAvailable }" id="presenter_video" autoplay>
+              Video unavailable
+            </video>
+            <img src="http://placehold.it/400x300/000000/fff&text=No Video" alt="Presenter" class="img-fluid rounded no-video-img col-sm-12  pl-0 pr-0" v-bind:class="{ 'd-block': !isVidAvailable, 'd-none': isVidAvailable }" />
+            <div class="remote-videos row">
+              
+            </div>
+            
+          </div>
+    </template>
+  </body>
+</html>
