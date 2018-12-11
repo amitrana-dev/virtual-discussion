@@ -348,6 +348,7 @@
       // pick value from meta tags
       let token = document.querySelector('meta[key=token][value]').getAttribute('value')
       let discussionId = document.querySelector('meta[key=discussion_id][value]').getAttribute('value')
+      let socketServerUrl = document.querySelector('meta[key=socket_server_url][value]').getAttribute('value')
 
       // replace if found in query params
       let urlParams = new URLSearchParams(window.location.search)
@@ -359,7 +360,7 @@
 
       that.discussionId = discussionId
 
-      that.socket = require('socket.io-client')('http://localhost:3000', { query: 'token=' + token + '&discussion_id=' + discussionId })
+      that.socket = require('socket.io-client')(socketServerUrl, { query: 'token=' + token + '&discussion_id=' + discussionId })
 
       that.socket.on('discussiondetail', function (course) {
         that.course = course

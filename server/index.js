@@ -1,4 +1,5 @@
 'use strict'
+require('dotenv').config()
 const CLUSTER = require('cluster')
 const STICKY = require('sticky-session')
 const HTTP = require('http')
@@ -39,7 +40,7 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
     .then((result) => {
       let [discussionInfo,user]=result
       user.peerId=socket.id;
-      
+
       // Join user to discusison
       socket.join(discussionId)
       
