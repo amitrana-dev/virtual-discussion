@@ -420,19 +420,16 @@
       document.querySelector('.no-video-img').addEventListener('load', that.handleResize)
       that.handleResize()
       let bufferDumped=false;
+      let serverConnectError;
       // make socket connection  
       let io = require('socket.io-client')(socketServerUrl, { query: 'token=' + token + '&discussion_id=' + discussionId })
       io.on('disconnect', () => {
-        Vue.toasted.error('Server is offline!',{position: 'bottom-right',action:[
-          {
-            text: 'Close',
-            onClick: (e,toast)=>{
-              toast.goAway(0);
-            }
-          }]}).goAway(4000);
+        serverConnectError=Vue.toasted.error('Server is offline!',{position: 'bottom-right'});
         that.isLoading = true;
       });
       io.on('connect', () => {
+        if(serverConnectError) serverConnectError.goAway(0);
+
         that.socket=io;
         that.socket.on('discussiondetail', function (course) {
           that.course = course
