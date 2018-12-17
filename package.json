@@ -41,6 +41,7 @@
     "uws": "^99.0.0",
     "vue-toasted": "^1.1.26",
     "vue2-notify": "^1.4.0",
+    "vuejs-paginate": "^2.1.0",
     "websocket": "^1.0.28"
   }
 }

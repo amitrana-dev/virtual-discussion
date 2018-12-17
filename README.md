@@ -25,7 +25,7 @@ Virtual Discussion uses a number of open source projects to work properly:
 
 Virtual Discussion requires [Node.js](https://nodejs.org/) v8+ to run.
 
-Copy .env-example to new .env file and fill out the settings for mysql/redis and others. 
+Copy .env-example to new .env file and fill out the settings for mysql/redis and others. Also replace the meta tags value by user token, discussion id and server url on client/index.html (we are assuming that user is already logged in and have info about discussion room).
 Install the dependencies and devDependencies and start the server.
 
 ```sh

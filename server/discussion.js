@@ -83,13 +83,13 @@ var Discussion = function () {
         }
       })
     })
-    socket.on('editorchange_langugage', function (lang, tabId) {
+    socket.on('editorchange_language', function (lang, tabId) {
       let discussionId = mapSocketToDiscussion[socket.id]
-      if (CONFIG.DEBUG) { console.log('editorchange_selection ' + discussionId) }
+      if (CONFIG.DEBUG) { console.log('editorchange_language ' + discussionId) }
       redis.hget('workplace', discussionId, (err, workplace) => {
         if (err && CONFIG.DEBUG) console.warn(err)
         if (workplace) {
-          socket.to(discussionId).emit('editorchange_langugage', lang, tabId)
+          socket.to(discussionId).emit('editorchange_language', lang, tabId)
           workplace = JSON.parse(workplace)
           if (!workplace['tabs']) workplace['tabs'] = []
           for (let i = 0; i < workplace['tabs'].length; i++) {
@@ -158,7 +158,7 @@ var Discussion = function () {
                 socket.emit(tab['ops'][j][0], tab['ops'][j][1], tabIds[i])
               }
             }
-          }, 10)
+          }, 100)
         }
       })
     })

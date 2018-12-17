@@ -105,10 +105,14 @@
           <div v-for="(item,index) in contentTabs" class="content-tabs  position-relative" :class="{'d-block': currentTab===item.id,'d-none': currentTab!==item.id}">
             <iframe class="youtube-player position-absolute border-0" allowfullscreen allow="autoplay" v-if="item.type==='youtube'" :youtubeId="item.id" :src="'https://www.youtube.com/embed/'+item.videoId+'?autoplay='+(currentTab===item.id ? 1 : 0)+'&controls=1'"></iframe>
             <code-editor  v-if="item.type==='code'" :item="item" :socket="socket" :discussion-id="discussionId"></code-editor>
+            <video class="col-sm-12" style="max-height:100%;" controls autoplay :src="item.url" v-if="item.type==='media' && item.mediaType==='video'"></video>
+            <audio class="col-sm-12" style="top:43%;" controls autoplay v-if="item.type==='media' && item.mediaType==='audio'">
+              <source :src="item.url"></source>
+            </audio>
           </div>
           <!-- Tabs Body ended -->
           <!-- Loader -->
-          <div class="modal-backdrop fade show loader" :class="{'d-block': isLoading ,'d-none': !isLoading}"><div class="position-fixed text-white loader-container"><div class="lds-ripple"><div></div><div></div></div></div></div>
+          <div class="modal-backdrop fade show loader" :class="{'d-block': isLoading ,'d-none': !isLoading}"><div class="position-fixed loader-container"><div class="lds-ripple"><div class="border-white"></div><div class="border-white"></div></div></div></div>
           <!-- Models started -->
           <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['youtube'],'d-none': !showItem['youtube']}">
             <div class="modal-dialog modal-dialog" role="document">
@@ -136,6 +140,42 @@
               </div>
             </div>
           </div>
+          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['media'],'d-none': !showItem['media']}">
+            <div class="modal-dialog modal-dialog modal-lg" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">Load media content</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('media')">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <p v-if="mediaList.length <= 0">No media content available</p>
+                  <div v-if="isLoadingMedia" class="d-flex justify-content-center loader-container"><div class="lds-ripple"><div class="border-dark"></div><div class="border-dark"></div></div></div>
+                  <media-list v-if="!isLoadingMedia" :media-list="mediaList"></media-list>
+                  <paginate
+                    v-if="!isLoadingMedia"
+                    v-model="currentMediaPage"
+                    :page-count="totalMediaPages"
+                    :click-handler="changeMediaPage"
+                    :prev-text="'&laquo;'"
+                    :next-text="'&raquo;'"
+                    :container-class="'pagination justify-content-center'"
+                    :page-class="'page-item'"
+                    :page-link-class="'page-link'"
+                    :prev-class="'page-item'"
+                    :prev-link-class="'page-link'"
+                    :next-class="'page-item'"
+                    :next-link-class="'page-link'"
+                    >
+                  </paginate>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('media')">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="modal-backdrop fade show" :class="{'d-block': showItem['youtube'] || showItem['media'] || showItem['content'] ,'d-none': !showItem['youtube'] && !showItem['media'] && !showItem['content']}"></div>
           <!-- Models ended -->
         </div>
@@ -156,6 +196,13 @@
           </option>
         </select>
         <div class="code-editor position-absolute" :id="item.id"></div>
+      </div>
+    </template>
+    <template id="media-list">
+      <div class="row media-list" v-if="mediaList.length">
+        <div class="media-item col-sm-3" v-for="media in mediaList">
+          <a @click="loadVideo(media)" href="javascript:void(0)">{{media.title}}</a>
+        </div>
       </div>
     </template>
     <template id="message-list">

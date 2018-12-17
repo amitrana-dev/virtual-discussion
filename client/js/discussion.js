@@ -1,6 +1,8 @@
 /* globals Vue,ace */
 'use strict';
 (function () {
+  var Paginate = require('vuejs-paginate');
+  Vue.component('paginate', Paginate);
   Vue.use(Toasted);
   Vue.filter('capitalize', function (value) {
     if (!value) return ''
@@ -139,6 +141,15 @@
       })
     }
   })
+  Vue.component('media-list', {
+    props: ['mediaList'],
+    template: '#media-list',
+    methods: {
+      loadVideo: function(media){
+        VirtualDiss.$emit('loadVideo', media);
+      }
+    }
+  })
   Vue.component('code-editor', {
     props: ['item', 'socket', 'discussionId'],
     data: function () {
@@ -151,12 +162,11 @@
     template: '#code-editor',
     methods: {
       changeLanguage: function (tabId) {
+        this.editor.session.setMode('ace/mode/' + this.chosenLang);
         VirtualDiss.$emit('languageChanged', this.chosenLang, tabId)
-      }
-    },
-    watch: {
-      socket: function () {
-        var that = this
+      },
+      startSocket: function(){
+        let that=this;
         that.silent = false
         that.socket.on('editorchange', (e, tabId) => {
           if (tabId !== that.item.id) return
@@ -176,11 +186,16 @@
           that.editor.getSelection().moveCursorToPosition(JSON.parse(curPosition))
           that.silent = false
         })
-        that.socket.on('editorchange_langugage', (language, tabId) => {
+        that.socket.on('editorchange_language', (language, tabId) => {
           if (tabId !== that.item.id) return
           that.chosenLang = language
           that.editor.session.setMode('ace/mode/' + language)
         })
+      }
+    },
+    watch: {
+      socket: function(){
+        that.startSocket();
       }
     },
     mounted: function () {
@@ -204,7 +219,9 @@
         if (that.silent) return
         that.socket.emit('editorchange_cursor', JSON.stringify(that.editor.selection.getCursor()), that.item.id)
       })
-
+      if(that.socket.connected){
+        that.startSocket();
+      }
       setTimeout(function () {
         that.editor.resize()
       }, 100)
@@ -340,7 +357,11 @@
       presenter: null,
       participants:{},
       totalParticipants: 0,
-      showNotification: false
+      showNotification: false,
+      mediaList: [],
+      isLoadingMedia: false,
+      totalMediaPages: 0,
+      currentMediaPage: 1
     },
     components: { videoBox: videoBox, chatBox: chatBox },
     mounted: function () {
@@ -359,54 +380,7 @@
       if (paramDiscussionId) discussionId = paramDiscussionId
 
       that.discussionId = discussionId
-
-      that.socket = require('socket.io-client')(socketServerUrl, { query: 'token=' + token + '&discussion_id=' + discussionId })
-
-      that.socket.on('discussiondetail', function (course) {
-        that.course = course
-      })
-      that.socket.on('validuser', function (user) {
-        that.loggedInUser = user
-        that.isLoading = false
-      })
-      that.socket.on('invaliduser', function (msg) {
-        Vue.toasted.error(msg,{position: 'bottom-right'}).goAway(2000);
-        setTimeout(() => {
-          Vue.toasted.error('Redirecting to home..',{position: 'bottom-right'});
-          // setTimeout(()=>{window.location='/'},1000)
-        }, 3000)
-      })
-      that.socket.on('tabadd', function (tabItem) {
-        that.addContainer(JSON.parse(tabItem))
-      })
-      that.socket.on('tabremove', function (tabId) {
-        that.removeContainer(tabId, true)
-      })
-      that.socket.on('tabchanged', function (tabId) {
-        that.currentTab = tabId
-      })
       let raisedHands={};
-      that.socket.on('raisehand', function (info) {
-        if(raisedHands.hasOwnProperty(info.user.identity)) return;
-        raisedHands[info.user.identity]=1;
-        Vue.toasted.info(info.user.firstName+' raised a request!',{position: 'bottom-right',action: [
-          {
-            text: 'Chat',
-            onClick: (e,toast)=>{
-              delete raisedHands[info.user.identity];
-              that.$refs.chatBox.chatWith(info.user.identity);
-              toast.goAway(0);
-            }
-          },
-          {
-            text: 'Close',
-            onClick: (e,toast)=>{
-              delete raisedHands[info.user.identity];
-              toast.goAway(0);
-            }
-          }
-        ]});
-      })
       function addParticipants(peers,typeArray){
         if(typeArray){
           Object.keys(peers).forEach(function(peerId){
@@ -419,63 +393,147 @@
         }
         
       }
-      that.socket.on('participants',function(peers){
-        addParticipants(peers,true);
-        that.totalParticipants=Object.keys(peers).length;
-      });
-      that.socket.on('peer-connect', function (data) {
-        data.user.peerId=data.socketId;
-        addParticipants(data.user,false);
-        that.totalParticipants+=1;
-        if(data.user.presenter==true){
-          Vue.toasted.success('Presenter is online!',{position: 'bottom-right'}).goAway(1000);
-          that.presenter = data.user
-        }
-      });
-      that.socket.on('disconnect', function (err) {
-        that.participants={};
-        that.totalParticipants=0;
-      });
-      that.socket.on('peer-disconnect', function (data) {
-        let peerIdentity;
-        Object.keys(that.participants).forEach(identity=>{
-          if(that.participants[identity].peerId===data.socketId){
-            peerIdentity=identity;
-            return;
-          }
-        });
-        if(peerIdentity){
-          delete that.participants[peerIdentity];
-          that.totalParticipants-=1;
-        }
-        if(that.presenter===null) return;
-        if(data.socketId==that.presenter.peerId){
-          Vue.toasted.error('Presenter is gone offline!',{position: 'bottom-right'}).goAway(1000);
-          that.presenter=null;
-        }
-      })
-      that.socket.emit('dumpbuffer')
       that.$on('languageChanged', function (lang, tabId) {
         for (let i = 0; i < that.contentTabs.length; i++) {
-          if (this.contentTabs[i].id === tabId) {
-            this.contentTabs[i].language = lang
+          if (that.contentTabs[i].id === tabId) {
+            that.contentTabs[i].language = lang
             break
           }
         }
-        that.socket.emit('editorchange_langugage', lang, tabId)
+        that.socket.emit('editorchange_language', lang, tabId)
       })
       that.$on('chatGroupChanged', function () {
-        this.handleResize();
+        that.handleResize();
       })
+      that.$on('loadVideo',function(media){
+        let tabId = this.uuidv4()
+        let tabItem = { id: tabId, name: 'Media - ' + media.title, type: 'media', url: media.url, mediaType: media.type }
+        this.addContainer(tabItem)
+        this.toggleModel('media')
+        this.socket.emit('tabadd', JSON.stringify(tabItem))
+      });
       setInterval(function () {
         that.$emit('timeChanged', Date.now())
       }, 1000)
-      window.addEventListener('resize', this.handleResize)
-      window.addEventListener('click', this.handleClick)
-      document.querySelector('.no-video-img').addEventListener('load', this.handleResize)
-      this.handleResize()
+      window.addEventListener('resize', that.handleResize)
+      window.addEventListener('click', that.handleClick)
+      document.querySelector('.no-video-img').addEventListener('load', that.handleResize)
+      that.handleResize()
+      let bufferDumped=false;
+      // make socket connection  
+      let io = require('socket.io-client')(socketServerUrl, { query: 'token=' + token + '&discussion_id=' + discussionId })
+      io.on('disconnect', () => {
+        Vue.toasted.error('Server is offline!',{position: 'bottom-right',action:[
+          {
+            text: 'Close',
+            onClick: (e,toast)=>{
+              toast.goAway(0);
+            }
+          }]}).goAway(4000);
+        that.isLoading = true;
+      });
+      io.on('connect', () => {
+        that.socket=io;
+        that.socket.on('discussiondetail', function (course) {
+          that.course = course
+        })
+        that.socket.on('validuser', function (user) {
+          that.loggedInUser = user
+          that.isLoading = false
+        })
+        that.socket.on('invaliduser', function (msg) {
+          Vue.toasted.error(msg,{position: 'bottom-right'}).goAway(2000);
+          setTimeout(() => {
+            Vue.toasted.error('Redirecting to home..',{position: 'bottom-right'});
+            // setTimeout(()=>{window.location='/'},1000)
+          }, 3000)
+        })
+        that.socket.on('tabadd', function (tabItem) {
+          that.addContainer(JSON.parse(tabItem))
+        })
+        that.socket.on('tabremove', function (tabId) {
+          that.removeContainer(tabId, true)
+        })
+        that.socket.on('tabchanged', function (tabId) {
+          that.currentTab = tabId
+        })
+        that.socket.on('raisehand', function (info) {
+          if(raisedHands.hasOwnProperty(info.user.identity)) return;
+          raisedHands[info.user.identity]=1;
+          Vue.toasted.info(info.user.firstName+' raised a request!',{position: 'bottom-right',action: [
+            {
+              text: 'Chat',
+              onClick: (e,toast)=>{
+                delete raisedHands[info.user.identity];
+                that.$refs.chatBox.chatWith(info.user.identity);
+                toast.goAway(0);
+              }
+            },
+            {
+              text: 'Close',
+              onClick: (e,toast)=>{
+                delete raisedHands[info.user.identity];
+                toast.goAway(0);
+              }
+            }
+          ]});
+        })
+        that.socket.on('participants',function(peers){
+          addParticipants(peers,true);
+          that.totalParticipants=Object.keys(peers).length;
+        });
+        that.socket.on('peer-connect', function (data) {
+          data.user.peerId=data.socketId;
+          addParticipants(data.user,false);
+          that.totalParticipants+=1;
+          if(data.user.presenter==true){
+            Vue.toasted.success('Presenter is online!',{position: 'bottom-right'}).goAway(1000);
+            that.presenter = data.user
+          }
+        });
+        that.socket.on('disconnect', function (err) {
+          that.participants={};
+          that.totalParticipants=0;
+        });
+        that.socket.on('peer-disconnect', function (data) {
+          let peerIdentity;
+          Object.keys(that.participants).forEach(identity=>{
+            if(that.participants[identity].peerId===data.socketId){
+              peerIdentity=identity;
+              return;
+            }
+          });
+          if(peerIdentity){
+            delete that.participants[peerIdentity];
+            that.totalParticipants-=1;
+          }
+          if(that.presenter===null) return;
+          if(data.socketId==that.presenter.peerId){
+            Vue.toasted.error('Presenter is gone offline!',{position: 'bottom-right'}).goAway(1000);
+            that.presenter=null;
+          }
+        });
+        that.socket.on('loadmedia', function (mediaData) {
+          mediaData=JSON.parse(mediaData);
+          that.mediaList=mediaData.mediaList;
+          that.currentMediaPage=mediaData.page;
+          that.totalMediaPages=mediaData.total_pages;
+          that.isLoadingMedia=false;
+        });
+        if(!bufferDumped){
+          that.socket.emit('dumpbuffer')
+          bufferDumped=true;
+        }
+        // load Media files
+        that.changeMediaPage(1);
+      });
     },
     methods: {
+      changeMediaPage: function(pageNum){
+        this.isLoadingMedia=true;
+        this.currentMediaPage=pageNum;
+        this.socket.emit('loadmedia', pageNum);
+      },
       chatWith: function(identity){
         if(identity !== this.loggedInUser.identity){
           this.$refs.chatBox.chatWith(identity);
