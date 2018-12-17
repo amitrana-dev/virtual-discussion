@@ -351,7 +351,7 @@
       contentTabs: [],
       socket: null,
       currentTab: null,
-      isLoading: false,
+      isLoading: true,
       loggedInUser: null,
       discussionId: null,
       presenter: null,
