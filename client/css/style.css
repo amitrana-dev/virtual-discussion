@@ -565,3 +565,6 @@ div.remote-videos .video_box .vid-controls a.audio-control .fa-microphone, div.r
     font-weight: bold;
     line-height: 15px;
 }
+
+/* white-board */
+div.white-board{width: 100%; height: 100%;}
