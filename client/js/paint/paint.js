@@ -120,7 +120,7 @@ module.exports=(...args)=>{
 			var input = document.createElement("input");
 			input.type = control.range ? "range" : "number";
 			input.value = control.value;
-			input.className = (control.classAppend || "") + "form-control custom-range h-auto pl-1 pr-1";
+			input.className = (control.classAppend || "") + "form-control custom-range h-auto pl-1 pr-1 bg-white";
 
 			if (control.text)
 				input.placeholder = control.text;
@@ -3247,7 +3247,7 @@ module.exports=(...args)=>{
 		        return contains(style.backgroundColor, 'rgba') || contains(style.backgroundColor, 'hsla');
 		    })(),
 		    inputTypeColorSupport = (function() {
-		        var colorInput = $("<input type='color' value='!' />")[0];
+		        var colorInput = $("<input type='color' value='#000000' />")[0];
 		        return colorInput.type === "color" && colorInput.value !== "!";
 		    })(),
 		    replaceInput = [
@@ -5962,7 +5962,8 @@ module.exports=(...args)=>{
 		        }
 		    }
 		    return context;
-		};function Paint (container, settings) {
+		};
+		function Paint (container, settings) {
 			this.eventHandlers = {};
 			this.settings = this.utils.merge(this.utils.copy(settings), this.defaultSettings);
 
@@ -6004,6 +6005,7 @@ module.exports=(...args)=>{
 			this.keyMap = []; // https://stackoverflow.com/questions/29266602/javascript-when-having-pressed-2-keys-simultaneously-down-leaving-one-of-them
 
 			window.addEventListener("resize", this.resize.bind(this));
+			window.addEventListener("redraw", this.resize.bind(this));
 			window.addEventListener("keypress", this.keypress.bind(this));
 			window.addEventListener("keydown", this.keydown.bind(this));
 			window.addEventListener("keyup", this.keyup.bind(this));
@@ -6056,6 +6058,7 @@ module.exports=(...args)=>{
 			this.local.redrawOnce();
 
 			this.redrawPaths();
+			this.redrawLocals();
 			this.redrawFrames();
 		};
 
@@ -6509,6 +6512,8 @@ module.exports=(...args)=>{
 		};
 
 		Paint.prototype._redrawPaths = function _redrawPaths () {
+			// only drawing on local
+			return;
 			this.pathContext.clearRect(0, 0, this.pathContext.canvas.width, this.pathContext.canvas.height);
 			delete this.redrawPathsTimeout;
 
@@ -6610,6 +6615,7 @@ module.exports=(...args)=>{
 		};
 
 		Paint.prototype.redrawLocals = function redrawLocals (noclear) {
+			if(!this.localDrawings) return;
 			// Force the redrawing of locals in this frame
 			this.local.clearAll();
 			this.localDrawings.forEach(this.drawDrawing.bind(this, "local"));
@@ -6662,7 +6668,12 @@ module.exports=(...args)=>{
 			this.redrawFrames();
 		};
 
+		Paint.prototype.undoManually = function undoManually () {
+			this.localDrawings.pop();
+			this.redrawLocals();
+		};
 		Paint.prototype.undo = function undo () {
+			this.undoManually();
 			this.dispatchEvent({
 				type: "undo"
 			});
@@ -6746,15 +6757,20 @@ module.exports=(...args)=>{
 			return false;
 		};
 
+		Paint.prototype.addDrawing = function addDrawing (drawing) {
+			this.localDrawings.push(drawing);
+			drawing.color=tinycolor(drawing.color);
+			this.drawDrawing("local", drawing);
+		};
 		// Function that should be called when a new drawing is added
 		// because of a user interaction. Calls the userdrawing event
 		Paint.prototype.addUserDrawing = function addUserDrawing (drawing) {
-			this.drawDrawing("local", drawing);
-			this.localDrawings.push(drawing);
-
+			let tempDrawing=Object.assign({},drawing);
+			tempDrawing.color=drawing.color.toRgbString();
+			this.addDrawing(drawing);
 			this.dispatchEvent({
 				type: "userdrawing",
-				drawing: drawing,
+				drawing: tempDrawing,
 				removeDrawing: this.removeLocalDrawing.bind(this, drawing)
 			});
 		};
@@ -6766,7 +6782,7 @@ module.exports=(...args)=>{
 				color: this.current_color,
 				size: this.current_size
 			});
-
+			//this.drawPath(this.localUserPaths[this.localUserPaths.length -1]);
 			this.dispatchEvent({
 				type: "startuserpath",
 				props: this.localUserPaths[this.localUserPaths.length - 1]
@@ -6783,8 +6799,7 @@ module.exports=(...args)=>{
 				point: point,
 				removePathPoint: this.removeUserPathPoint.bind(this, lastPath, point)
 			});
-
-			this.redrawPaths();
+			this.drawPath(lastPath,this.effectsCanvasCtx);
 		};
 
 		Paint.prototype.endUserPath = function endUserPath () {
@@ -6797,6 +6812,9 @@ module.exports=(...args)=>{
 				type: "enduserpath",
 				removePath: this.removeUserPath.bind(this, lastPath)
 			});
+			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
+			this.addUserDrawing(lastPath)
+			this.drawPath(lastPath,this.local.context,this.local);
 		};
 
 		Paint.prototype.removeUserPathPoint = function removeUserPathPoint (path, point) {
@@ -6969,6 +6987,15 @@ module.exports=(...args)=>{
 				value: "line",
 				action: this.changeTool.bind(this)
 			}, {
+				name: "circle",
+				type: "button",
+				html: "i",
+				place: "left",
+				elemClass: "fa fa-circle",
+				title: "Change tool to circle",
+				value: "circle",
+				action: this.changeTool.bind(this)
+			}, {
 				name: "brush",
 				type: "button",
 				html: "i",
@@ -7003,15 +7030,7 @@ module.exports=(...args)=>{
 				title: "Drag tool to zoom in/out",
 				value: "zoom",
 				action: this.changeTool.bind(this)
-			}, /*{
-				name: "select",
-				type: "button",
-				html: "i",
-				elemClass: "fas fa-search",
-				title: "Change tool to select",
-				value: "select",
-				action: this.changeTool.bind(this)
-			}, */{
+			}, {
 				name: "undo",
 				type: "button",
 				html: "i",
@@ -7020,7 +7039,15 @@ module.exports=(...args)=>{
 				title: "Undo drawing",
 				value: "undo",
 				action: this.undo.bind(this)
-			}, /*{
+			},/*{
+				name: "select",
+				type: "button",
+				html: "i",
+				elemClass: "fas fa-search",
+				title: "Change tool to select",
+				value: "select",
+				action: this.changeTool.bind(this)
+			}, {
 				name: "block",
 				type: "button",
 				image: "images/icons/block.png",
@@ -7154,8 +7181,7 @@ module.exports=(...args)=>{
 			if (this.boundingBoxList.indexOf(target) == -1)
 				this.boundingBoxList.push(target);
 
-			target.boundingBoxCache = target.boundingBoxCache || target.getBoundingClientRect();
-
+			target.boundingBoxCache = (target.boundingBoxCache && target.boundingBoxCache.left > 0) ? target.boundingBoxCache : target.getBoundingClientRect();
 			var relativeX = clientX - target.boundingBoxCache.left,
 			    relativeY = clientY - target.boundingBoxCache.top;
 
@@ -7427,6 +7453,76 @@ module.exports=(...args)=>{
 					context.fill();			
 				}
 			},
+			circle: function circle (paint, event) {
+				if (event == "remove") {
+					delete paint.lastLinePoint;
+					delete paint.drawingCircle;
+					paint.effectsCanvas.style.cursor = "";
+					return;
+				}
+
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+
+				if ((event.type == "mousedown" || event.type == "touchstart")) {
+					paint.lastLinePoint = scaledCoords;
+					paint.drawingCircle=true;
+				}
+
+				if (event.type == "mouseup" || event.type == "touchend") {
+					paint.drawingCircle=false;
+					// If mouseup is on the same point as mousedown we switch behaviour by making
+					// a line between two clicks instead of dragging
+					if (paint.lastLinePoint[0] == scaledCoords[0] && paint.lastLinePoint[1] == scaledCoords[1]) {
+						return;
+					}
+
+					paint.addUserDrawing({
+						type: "circle",
+						x: Math.round((paint.local.leftTopX + (paint.lastLinePoint[0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
+						y: Math.round((paint.local.leftTopY + (paint.lastLinePoint[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						x1: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						y1: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						size: paint.current_size,
+						color: paint.current_color
+					});
+
+					delete paint.lastLinePoint;
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+				}
+
+				if ((event.type == "mousemove" || event.type == "touchmove")) {
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+					// TODO refactor this to use drawFunctions
+					var context = paint.effectsCanvasCtx;
+					if(paint.drawingCircle){
+						let circleRadius=Math.max(Math.abs(paint.lastLinePoint[0] - scaledCoords[0]),Math.abs(paint.lastLinePoint[1] - scaledCoords[1]));
+						context.beginPath();
+						context.arc(scaledCoords[0], scaledCoords[1], circleRadius, 0, 2 * Math.PI, true);
+						context.fillStyle = paint.current_color.toRgbString();
+						context.fill();	
+					}else{
+						context.beginPath();
+						context.arc(scaledCoords[0], scaledCoords[1], 2, 0, 2 * Math.PI, true);
+
+						if (paint.current_color.type == "gradient") {
+							if (!paint.current_color[0]) {
+								context.fillStyle = "black";
+							} else {
+								context.fillStyle = paint.current_color[0].color.toRgbString();	
+							}
+						} else {
+							context.fillStyle = paint.current_color.toRgbString();
+						}
+
+						context.fill();
+						// Save the last move point for efficient clearing
+						paint.lastMovePoint= scaledCoords;
+					}
+								
+				}
+			},
 			brush: function brush (paint, event, type) {
 				if (event == "remove") {
 					delete paint.lastMovePoint;
@@ -7440,7 +7536,6 @@ module.exports=(...args)=>{
 				// Get the coordinates relative to the canvas
 				var targetCoords = paint.getCoords(event);
 				var scaledCoords = paint.scaledCoords(targetCoords, event);
-
 				if (event.type == "mousedown" || event.type == "touchstart") {
 					paint.brushing = true;
 					paint.addUserPath();
@@ -7453,7 +7548,7 @@ module.exports=(...args)=>{
 				}
 
 				if (event.type == "mouseup" || event.type == "touchend" || event.type == "mouseleave") {
-					paint.endUserPath();
+					if(paint.brushing) paint.endUserPath();
 					paint.brushing = false;
 				}
 
@@ -7785,6 +7880,18 @@ module.exports=(...args)=>{
 					tiledCanvas.executeNoRedraw();
 				}
 			},
+			circle: function (context, drawing, tiledCanvas) {
+				let circleRadius=Math.max(Math.abs(drawing.x - drawing.x1),Math.abs(drawing.y - drawing.y1));
+				context.beginPath();
+				context.arc(drawing.x1, drawing.y1, circleRadius, 0, 2 * Math.PI, true);
+				context.fillStyle = drawing.color.toRgbString();
+				context.fill();
+				
+				if (tiledCanvas) {
+					tiledCanvas.drawingRegion(drawing.x, drawing.y, drawing.x1, drawing.y1, drawing.size);
+					tiledCanvas.executeNoRedraw();
+				}
+			},
 			path: function (context, drawing, tiledCanvas) {
 				this.drawPath(drawing, context, tiledCanvas);
 			},
@@ -7843,117 +7950,6 @@ module.exports=(...args)=>{
 				var yDist = point1[1] - point2[1];
 				return xDist * xDist + yDist * yDist;
 			}
-		};
-
-		/**
-		 * Event dispatcher
-		 * License mit
-		 * https://github.com/mrdoob/eventdispatcher.js
-		 * @author mrdoob / http://mrdoob.com/
-		 */
-
-		var EventDispatcher = function () {}
-
-		EventDispatcher.prototype = {
-
-			constructor: EventDispatcher,
-
-			apply: function ( object ) {
-
-				object.addEventListener = EventDispatcher.prototype.addEventListener;
-				object.hasEventListener = EventDispatcher.prototype.hasEventListener;
-				object.removeEventListener = EventDispatcher.prototype.removeEventListener;
-				object.dispatchEvent = EventDispatcher.prototype.dispatchEvent;
-
-			},
-
-			addEventListener: function ( type, listener ) {
-
-				if ( this._listeners === undefined ) this._listeners = {};
-
-				var listeners = this._listeners;
-
-				if ( listeners[ type ] === undefined ) {
-
-					listeners[ type ] = [];
-
-				}
-
-				if ( listeners[ type ].indexOf( listener ) === - 1 ) {
-
-					listeners[ type ].push( listener );
-
-				}
-
-			},
-
-			hasEventListener: function ( type, listener ) {
-
-				if ( this._listeners === undefined ) return false;
-
-				var listeners = this._listeners;
-
-				if ( listeners[ type ] !== undefined && listeners[ type ].indexOf( listener ) !== - 1 ) {
-
-					return true;
-
-				}
-
-				return false;
-
-			},
-
-			removeEventListener: function ( type, listener ) {
-
-				if ( this._listeners === undefined ) return;
-
-				var listeners = this._listeners;
-				var listenerArray = listeners[ type ];
-
-				if ( listenerArray !== undefined ) {
-
-					var index = listenerArray.indexOf( listener );
-
-					if ( index !== - 1 ) {
-
-						listenerArray.splice( index, 1 );
-
-					}
-
-				}
-
-			},
-
-			dispatchEvent: function ( event ) {
-					
-				if ( this._listeners === undefined ) return;
-
-				var listeners = this._listeners;
-				var listenerArray = listeners[ event.type ];
-
-				if ( listenerArray !== undefined ) {
-
-					event.target = this;
-
-					var array = [];
-					var length = listenerArray.length;
-
-					for ( var i = 0; i < length; i ++ ) {
-
-						array[ i ] = listenerArray[ i ];
-
-					}
-
-					for ( var i = 0; i < length; i ++ ) {
-
-						array[ i ].call( this, event );
-
-					}
-
-				}
-
-			}
-
 		};
 
 		EventDispatcher.prototype.apply(Paint.prototype);

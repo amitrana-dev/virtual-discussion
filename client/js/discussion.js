@@ -111,6 +111,10 @@ import Toasted from 'vue-toasted';
         })
         that.socket.on('tabchanged', function (tabId) {
           that.currentTab = tabId
+          setTimeout(function(){
+            that.handleResize();
+            window.dispatchEvent(new Event('resize'));
+          },100)
         })
         that.socket.on('raisehand', function (info) {
           if (raisedHands.hasOwnProperty(info.user.identity)) return
@@ -271,6 +275,10 @@ import Toasted from 'vue-toasted';
           // rightSideHeight= rightSideHeight < minHeight ? minHeight : rightSideHeight;
           document.querySelectorAll('.content-tabs').forEach(function (tab) {
             tab.style = 'height: ' + rightSideHeight + 'px'
+            tab.querySelectorAll('canvas').forEach(function(canvas){
+              canvas.setAttribute('height',rightSideHeight);
+              canvas.setAttribute('width',tab.clientWidth);
+            })
           })
         })
       },
@@ -323,8 +331,13 @@ import Toasted from 'vue-toasted';
         this.handleResize()
       },
       setCurrentTab: function (tabId) {
-        this.currentTab = tabId
-        this.socket.emit('tabchanged', tabId)
+        let that=this;
+        that.currentTab = tabId
+        that.socket.emit('tabchanged', tabId)
+        setTimeout(function(){
+          that.handleResize();
+          window.dispatchEvent(new Event('resize'));
+        },100)
       },
       toggleModel: function (itemType) {
         this.showItem[itemType] = !this.showItem[itemType]

@@ -6,6 +6,7 @@ const HTTP = require('http')
 const USER = require('./user')
 const DISCUSSION = require('./discussion')()
 const CHAT = require('./chat')()
+const WHITEBOARD = require('./whiteboard')()
 const UTILITY = require('./utility')()
 const CONFIG=require('./config')
 
@@ -125,6 +126,8 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
         DISCUSSION.init(REDIS, socket, mapSocketToDiscussion, user)
         // start listening for chat messages
         CHAT.init(REDIS, socket, IO, mapSocketToDiscussion, user)
+        // start listening for drawing messages
+        WHITEBOARD.init(REDIS, socket, IO, mapSocketToDiscussion, user)
         // start listening for general events
         UTILITY.init(REDIS, socket, IO, mapSocketToDiscussion, user)
       })

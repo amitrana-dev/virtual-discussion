@@ -104,7 +104,7 @@
             <audio class="col-sm-12" style="top:43%;" controls autoplay v-if="item.type==='media' && item.mediaType==='audio'">
               <source :src="item.url"></source>
             </audio>
-            <white-board :item="item" v-if="item.type==='whiteboard'"></white-board>
+            <white-board :item="item" v-if="item.type==='whiteboard'" :socket="socket"></white-board>
           </div>
           <!-- Tabs Body ended -->
           <!-- Loader -->

@@ -126,42 +126,6 @@ var Discussion = function () {
       if (CONFIG.DEBUG) { console.log('editorclear_buffer ' + discussionId) }
       socket.to(discussionId).emit('editorclear_buffer', tabId)
     })
-    socket.on('dumpbuffer', function () {
-      let discussionId = mapSocketToDiscussion[socket.id]
-      if (CONFIG.DEBUG) { console.log('dumpbuffer ' + discussionId) }
-      redis.hget('workplace', discussionId, (err, workplace) => {
-        if (err || workplace == null) {
-          if (CONFIG.DEBUG) console.warn('WARNING: No work done on this workspace')
-        }
-        if (workplace) {
-          workplace = JSON.parse(workplace)
-          if (!workplace['tabs']) workplace['tabs'] = []
-          if (!workplace['chat']) workplace['chat'] = {}
-          if (!workplace['settings']) workplace['settings'] = []
-          // dump tabs
-          for (let i = 0; i < workplace['tabs'].length; i++) {
-            socket.emit('tabadd', JSON.stringify(workplace['tabs'][i]))
-          }
-          // dump chat
-          Object.keys(workplace['chat']).forEach(group=>{
-            if(group.indexOf(user.identity) !== -1 || group=='common'){
-              socket.emit('chatgroup', JSON.stringify(workplace['chat'][group]));
-            }
-          })
-          
-          // give time to create tabs
-          setTimeout(function () {
-            let tabIds = Object.keys(workplace['settings'])
-            for (let i = 0; i < tabIds.length; i++) {
-              let tab = workplace['settings'][tabIds[i]]
-              for (let j = 0; j < tab['ops'].length; j++) {
-                socket.emit(tab['ops'][j][0], tab['ops'][j][1], tabIds[i])
-              }
-            }
-          }, 100)
-        }
-      })
-    })
   }
   return {
     init: initDiscussion,
