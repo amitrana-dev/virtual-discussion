@@ -22,6 +22,7 @@
         <h5 class="my-0 mr-md-auto font-weight-normal">Virtual Discussion on {{course.title}}</h5>
         <nav class="my-2 my-md-0 mr-md-5" id="media-controls">
           <a class="p-2 text-dark fa" href="javascript:void(0)" title="Record Session" id="toggleRecording" @click="toggleRecording"><i class="fa fa-circle" :class="{'text-danger': isRecordingAvailable}"></i> REC</a>
+          <a class="p-2 fa" href="javascript:void(0)" v-if="loggedInUser && loggedInUser.presenter " title="Share Screen" id="toggleScreen" @click="toggleScreen" :class="{'text-danger': isScreenShared,'text-dark': !isScreenShared}"><i class="fa fa-desktop"></i></a>
           <a class="p-2 fa" href="javascript:void(0)" title="Toggle Video" id="toggleVideo" @click="toggleVideo" :class="{'text-danger': isVidAvailable,'text-dark': !isVidAvailable}"><i class="fa" :class="{'fa-video': isVidAvailable,'fa-video-slash': !isVidAvailable}"></i></a>
           <a class="p-2 fa" href="javascript:void(0)" title="Toggle Audio" id="toggleAudio" @click="toggleAudio"  :class="{'text-danger': isAudioAvailable,'text-dark': !isAudioAvailable}"><i class="fa" :class="{'fa-microphone': isAudioAvailable,'fa-microphone-slash': !isAudioAvailable}"></i></a>
         </nav>
@@ -29,7 +30,7 @@
           <a class="p-2 text-dark fa" title="Time Record" href="javascript:void(0)">
             <svg class="nav-time-record" width="25" height="25" viewbox="0 0 250 250">
               <circle cx="125" cy="125" r="120" stroke="black" stroke-width="2" fill="none" />
-              <path :d="drawRemainingTime(25)" stroke="black" transform="translate(125, 125) scale(.84)"/>
+              <path :d="drawRemainingTime()" stroke="black" transform="translate(125, 125) scale(.84)"/>
             </svg>
           </a>
           <a class="p-2 text-dark fa" href="javascript:void(0)" title="Toggle Layout"><i class="fa fa-columns"></i></a>
@@ -64,12 +65,12 @@
           </div>
           <a class="p-2 text-dark fa" v-if="loggedInUser && !loggedInUser.presenter  && presenter" href="javascript:void(0)" title="Raise Hand" @click="raiseHand()"><i class="fa fa-hand-paper"></i></a>
           <!--a class="p-2 text-dark fa" href="javascript:void(0)" title="Notifications"><i class="fa fa-bell"></i></a-->
-          <a class="ml-md-5 text-dark fa" href="javascript:void(0)" title="Toggle Fullscreen" @click="toggleFullscreen()"><i class="fa fa-expand"></i></a>
+          <a class="ml-md-5 text-dark fa" href="javascript:void(0)" title="Toggle Fullscreen" @click="toggleFullscreen('discussion_board')"><i class="fa fa-expand"></i></a>
         </nav>
       </div>
       <div class="d-flex flex-column flex-md-row p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm playground">
         <div class="col-md-3 border left-sidebar col-sm-12">
-          <video-box :socket="socket" :is-vid-available="isVidAvailable" :is-audio-available="isAudioAvailable" :discussion-id="discussionId"></video-box>
+          <video-box :socket="socket" @toggle-fullscreen="toggleFullscreen" @screen-share-stopped="stopScreenShare" :is-vid-available="isVidAvailable" :is-screen-shared="isScreenShared" :is-audio-available="isAudioAvailable" :discussion-id="discussionId"></video-box>
           <chat-box :socket="socket" :logged-in-user="loggedInUser" :participants="participants" ref="chatBox" @chat-group-changed="handleResize"></chat-box>
         </div>
         <div class="col-sm-12 d-xs-block mt-3 d-md-none"></div>
@@ -85,16 +86,19 @@
                 <a class="dropdown-item" href="javascript:void(0)" @click="toggleModel('content')">Content</a>
                 <a class="dropdown-item" href="javascript:void(0)" @click="addItem('code')">Code Editor</a>
                 <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="javascript:void(0)" @click="toggleModel('import')">Import Template</a>
+                <a class="dropdown-item" href="javascript:void(0)" @click="exportTemplate()">Export Template</a>
+                <div class="dropdown-divider"></div>
                 <a class="dropdown-item" href="javascript:void(0)">Save to PDF</a>
               </div>
             </li>
             <li class="nav-item ml-1" v-for="(item,index) in contentTabs">
-              <a class="nav-link active"  :class="{'bg-primary': currentTab===item.id,'text-white': currentTab===item.id}"  href="javascript:void(0)" @click="setCurrentTab(item.id)">{{ item.name }} | <i class="fa fa-times text-black" @click="removeContainer(item.id,false,$event)"></i></a>
+              <a class="nav-link active" title="Double click for renaming tab"  :class="{'bg-primary': currentTab===item.id,'text-white': currentTab===item.id}"  href="javascript:void(0)" @dblclick="renameTab(index)" @click="setCurrentTab(item.id)"><span v-if="!item.renaming">{{ item.name }}</span><label v-if="item.renaming" class="col-sm-10 m-0 p-0"><input type="text" @keypress="doneRenaming(index,$event)" v-model="item.name" class="form-control form-control-sm pt-0 pb-0 tab-input" /></label> | <i class="fa fa-times text-black" @click="removeContainer(item.id,false,$event)"></i></a>
             </li>
           </ul>
           <!-- Tabs nav ended -->
           <!-- Tabs Body started -->
-          <div class="default-tab content-tabs position-relative" :class="{'d-block': currentTab===null,'d-none': currentTab!==null}">
+          <div class="default-tab content-tabs position-relative" :class="{'d-block': currentTab===null || contentTabs.length ===0 ,'d-none': currentTab!==null && contentTabs.length > 0 }">
               <p>Welcome to Virtual Discussion</p>
           </div>
           <div v-for="(item,index) in contentTabs" class="content-tabs  position-relative" :class="{'d-block': currentTab===item.id,'d-none': currentTab!==item.id}">
@@ -104,7 +108,7 @@
             <audio class="col-sm-12" style="top:43%;" controls autoplay v-if="item.type==='media' && item.mediaType==='audio'">
               <source :src="item.url"></source>
             </audio>
-            <white-board :item="item" v-if="item.type==='whiteboard'" :socket="socket"></white-board>
+            <white-board :item="item" v-if="item.type==='whiteboard' || item.type==='content' " :socket="socket"></white-board>
           </div>
           <!-- Tabs Body ended -->
           <!-- Loader -->
@@ -132,6 +136,32 @@
                 </div>
                 <div class="modal-footer">
                   <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('youtube')">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['import'],'d-none': !showItem['import']}">
+            <div class="modal-dialog modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">Import template file</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('import')">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <div class="input-group">
+                    <div class="custom-file">
+                      <input type="file" id="templateFile" class="custom-file-input input-sm" accept=".vdtmpl" v-on:change="readTemplate" placeholder="Import template file" aria-label="Import template file" aria-describedby="import-template-submit">
+                      <label class="custom-file-label" for="templateFile" >Choose file</label>
+                    </div>
+                    <div class="input-group-append">
+                      <button class="btn btn-sm" id="import-template-submit" :disabled="templateFile==null" title="Import template file" v-on:click="importTemplate">Import <i class="fa fa-download"></i></button>
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('import')">Close</button>
                 </div>
               </div>
             </div>
@@ -172,7 +202,43 @@
               </div>
             </div>
           </div>
-          <div class="modal-backdrop fade show" :class="{'d-block': showItem['youtube'] || showItem['media'] || showItem['content'] ,'d-none': !showItem['youtube'] && !showItem['media'] && !showItem['content']}"></div>
+          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['content'],'d-none': !showItem['content']}">
+            <div class="modal-dialog modal-dialog modal-lg" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">Load Content</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('content')">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <p v-if="contentList.length <= 0">No content available</p>
+                  <div v-if="isLoadingContent" class="d-flex justify-content-center loader-container"><div class="lds-ripple"><div class="border-dark"></div><div class="border-dark"></div></div></div>
+                  <content-list v-if="!isLoadingContent" :content-list="contentList" @load-content="loadContent"></content-list>
+                  <paginate
+                    v-if="!isLoadingContent"
+                    v-model="currentContentPage"
+                    :page-count="totalContentPages"
+                    :click-handler="changeContentPage"
+                    :prev-text="'&laquo;'"
+                    :next-text="'&raquo;'"
+                    :container-class="'pagination justify-content-center'"
+                    :page-class="'page-item'"
+                    :page-link-class="'page-link'"
+                    :prev-class="'page-item'"
+                    :prev-link-class="'page-link'"
+                    :next-class="'page-item'"
+                    :next-link-class="'page-link'"
+                    >
+                  </paginate>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('content')">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-backdrop fade show" :class="{'d-block': showItem['youtube'] || showItem['media'] || showItem['content'] || showItem['import'] ,'d-none': !showItem['youtube'] && !showItem['media'] && !showItem['content'] && !showItem['import']}"></div>
           <!-- Models ended -->
         </div>
 
@@ -185,7 +251,10 @@
       </span>
     </template>
     <template id="white-board">
-      <div class="white-board" :id="item.id"></div>
+      <div class="white-board-container">
+        <div class="white-board" :id="item.id"></div>
+        <div v-if="item.type==='content' && Object.keys(item.content).length > 1 " class="content-nav position-absolute fixed-bottom text-center m-auto p-2"><a href="javascript:void(0)" class="btn-dark rounded-left p-2" @click="goPrev()" :class="{'disabled': item.currentPage <= 1 }"  title="Prev page">&laquo;</a><span class=" border-white bg-white rounded-0 p-2"> {{item.currentPage || 1 }} / {{Object.keys(item.content).length}} </span><a href="javascript:void(0)"  @click="goNext()" class="btn-dark rounded-right p-2" title="Next page" :class="{'disabled': item.currentPage >= Object.keys(item.content).length }">&raquo;</a></div>  
+      </div>
     </template>
     <template id="code-editor">
       <div class="code-container">
@@ -201,6 +270,13 @@
       <div class="row media-list" v-if="mediaList.length">
         <div class="media-item col-sm-3" v-for="media in mediaList">
           <a @click="loadVideo(media)" href="javascript:void(0)">{{media.title}}</a>
+        </div>
+      </div>
+    </template>
+    <template id="content-list">
+      <div class="row content-list" v-if="contentList.length">
+        <div class="content-item col-sm-3" v-for="content in contentList">
+          <a @click="loadContent(content)" href="javascript:void(0)">{{content.title}}</a>
         </div>
       </div>
     </template>
@@ -259,24 +335,32 @@
         </div>
         <div class="vid-controls">
           <div class="control-container">
-            <a class="p-2 fa video-control" href="javascript:void(0)" title="Toggle Video"><i class="fa fa-video-slash"></i><i class="fa fa-video"></i></a>
-            <a class="p-2 fa audio-control" href="javascript:void(0)" title="Toggle Audio"><i class="fa fa-microphone-slash"></i><i class="fa fa-microphone"></i></a>
+            <a class="p-1 fa video-control" href="javascript:void(0)" title="Toggle Video"><i class="fa fa-video-slash"></i><i class="fa fa-video"></i></a>
+            <a class="p-1 fa audio-control" href="javascript:void(0)" title="Toggle Audio"><i class="fa fa-microphone-slash"></i><i class="fa fa-microphone"></i>
+            </a>
+            <a class="p-1 fa expand-control" href="javascript:void(0)" title="Expand Fullscreen"><i class="fa fa-compress"></i><i class="fa fa-expand"></i></a>
+            
           </div>
         </div>
       </div>
     </template>
     <template id="video-box">
       <div class="row-fluid align-items-center pt-3" id="video-container">
-            <video class="rounded mx-auto col-sm-12 pl-0 pr-0" ref="videoObj" v-bind:class="{ 'd-block': isVidAvailable, 'd-none': !isVidAvailable }" id="presenter_video" autoplay>
+            <video class="rounded mx-auto col-sm-12 pl-0 pr-0" ref="videoObj" v-bind:class="{ 'd-block': isVidAvailable || isScreenShared, 'd-none': !isVidAvailable && !isScreenShared }" id="presenter_video" autoplay>
               Video unavailable
             </video>
-            <img src="http://placehold.it/400x300/000000/fff&text=No Video" alt="Presenter" class="img-fluid rounded no-video-img col-sm-12  pl-0 pr-0" v-bind:class="{ 'd-block': !isVidAvailable, 'd-none': isVidAvailable }" />
+            <img src="http://placehold.it/400x300/000000/fff&text=No Video" alt="Presenter" class="img-fluid rounded no-video-img col-sm-12  pl-0 pr-0" v-bind:class="{ 'd-block': !isVidAvailable && !isScreenShared, 'd-none': isVidAvailable || isScreenShared }" />
             <div class="remote-videos row">
               
             </div>
             
           </div>
     </template>
+    <script src="js/ice.js"></script>
+    <script src="js/screen/adapter.js"></script>
+    <!-- We are using webrtc extension for screen capture on chrome, so using their screenid too -->
+    <script src="//cdn.webrtc-experiment.com/getScreenId.js"></script>
+    <script src="js/screen/screen.js"></script>
     <script src="js/vendors.js" defer></script>
   </body>
 </html>

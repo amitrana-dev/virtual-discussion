@@ -43,8 +43,8 @@ div.remote-videos .video_box .vid-controls{background-color: #000;display: none;
 div.remote-videos .video_box .vid-controls a {
     color: black;
     background-color: white;
-    border-radius: 35%;
-    -webkit-border-radius: 35%;
+    border-radius: 10%;
+    -webkit-border-radius: 10%;
     text-decoration: none;
 }
 div.remote-videos .video_box:hover .vid-controls{
@@ -58,11 +58,14 @@ div.remote-videos .video_box .vid-controls .control-container{
   margin: auto;
   text-align: center;
 }
-div.remote-videos .video_box .vid-controls a.audio-control.active .fa-microphone, div.remote-videos .video_box .vid-controls a.audio-control .fa-microphone-slash, div.remote-videos .video_box .vid-controls a.video-control .fa-video-slash, div.remote-videos .video_box .vid-controls a.video-control.active .fa-video{
+div.remote-videos .video_box .vid-controls a.audio-control.active .fa-microphone, div.remote-videos .video_box .vid-controls a.expand-control.active .fa-compress, div.remote-videos .video_box .vid-controls a.expand-control .fa-expand, div.remote-videos .video_box .vid-controls a.audio-control .fa-microphone-slash, div.remote-videos .video_box .vid-controls a.video-control .fa-video-slash, div.remote-videos .video_box .vid-controls a.video-control.active .fa-video{
     display: block;
 }
-div.remote-videos .video_box .vid-controls a.audio-control .fa-microphone, div.remote-videos .video_box .vid-controls a.audio-control.active .fa-microphone-slash, div.remote-videos .video_box .vid-controls a.video-control .fa-video, div.remote-videos .video_box .vid-controls a.video-control.active .fa-video-slash{
+div.remote-videos .video_box .vid-controls a.audio-control .fa-microphone, div.remote-videos .video_box .vid-controls a.expand-control .fa-compress, div.remote-videos .video_box .vid-controls a.expand-control.active .fa-expand, div.remote-videos .video_box .vid-controls a.audio-control.active .fa-microphone-slash, div.remote-videos .video_box .vid-controls a.video-control .fa-video, div.remote-videos .video_box .vid-controls a.video-control.active .fa-video-slash{
     display: none;
+}
+div.remote-videos video::-webkit-media-controls {
+  display:none !important;
 }
 
 /* thanks to loader.io */
@@ -568,3 +571,6 @@ div.remote-videos .video_box .vid-controls a.audio-control .fa-microphone, div.r
 
 /* white-board */
 div.white-board{width: 100%; height: 100%;}
+input.tab-input{height: 24px;}
+div.content-nav{width: 200px;}
+div.content-nav .disabled{opacity: 0.5;}

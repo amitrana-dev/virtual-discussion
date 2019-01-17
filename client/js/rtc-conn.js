@@ -1,4 +1,4 @@
-/* globals webkitRTCPeerConnection,mozRTCPeerConnection,RTCSessionDescription,RTCIceCandidate */
+/* globals webkitRTCPeerConnection,mozRTCPeerConnection,RTCSessionDescription,RTCIceCandidate,IceServersHandler */
 function RTCConnection (socket, onRemoteStreamAdd, onRemoteStreamRemove, onDisconnect) {
   let that = this
   that.connections = {}
@@ -22,16 +22,7 @@ function RTCConnection (socket, onRemoteStreamAdd, onRemoteStreamRemove, onDisco
   that.createPeerConnection = (peerId) => {
     let RTCPeerConnection = webkitRTCPeerConnection || mozRTCPeerConnection
     let pcConfig = {
-      'iceServers': [
-        {
-          'urls': [
-            'stun:localhost:3478',
-            'stun:localhost:3478?transport=udp'
-          ],
-          'username': 'ammyt',
-          'credentials': '123456'
-        }
-      ]
+      'iceServers': IceServersHandler.getIceServers()
     }
     try {
       that.connections[peerId] = { pc: new RTCPeerConnection(pcConfig) }
@@ -51,13 +42,12 @@ function RTCConnection (socket, onRemoteStreamAdd, onRemoteStreamRemove, onDisco
         socket.json.send(that.connections[peerId].pc.localDescription, peerId)
       }
     }
-    // that.connections[peerId].pc.onnegotiationneeded = function (e) {
-    //   let pc=that.connections[peerId].pc;
-    //   if (pc.signalingState != "stable") return;
-    //    pc.createOffer({offerToReceiveVideo: true,offerToReceiveAudio: true})
-    //    .then(d=>pc.setLocalDescription(d))
-    //   .then(d=>{socket.json.send(pc.localDescription)})
-    // };
+    that.connections[peerId].pc.onnegotiationneeded = function (e) {
+      let pc=that.connections[peerId].pc;
+      if (pc.signalingState != "stable") return;
+       pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true })
+      .then(d => pc.setLocalDescription(d))
+    };
 
     that.connections[peerId].pc.ontrack = (e) => { onRemoteStreamAdd(e, peerId) }
   }
@@ -99,12 +89,31 @@ function RTCConnection (socket, onRemoteStreamAdd, onRemoteStreamRemove, onDisco
   that.sendStreamToPeer = (socketId) => {
     if (that.localStream == null) return
     let pc = that.connections[socketId].pc
-    that.localTracks[socketId] = []
-    that.localStream.getTracks().forEach(track => {
-      that.localTracks[socketId].push(pc.addTrack(track, that.localStream))
-    })
-    pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true })
-      .then(d => pc.setLocalDescription(d))
+    let gotVideo=false
+    let gotAudio=false
+    if(that.localTracks[socketId]){
+      that.localTracks[socketId].forEach((sender,index) => {
+        if(sender.track.kind === 'video'){
+          console.log('got video');
+          gotVideo=true;
+          sender.replaceTrack(that.localStream.getVideoTracks()[0]);
+        }else{
+          console.log('got audio');
+          gotAudio=true;
+          sender.replaceTrack(that.localStream.getAudioTracks()[0]);
+        }
+      })
+    }
+    // if(!gotVideo && !gotAudio) that.localTracks[socketId] = []
+    // if(!gotVideo || !gotAudio) that.localStream.getTracks().forEach(track => {
+    //   if( (!gotVideo && track.kind==='video') || (!gotAudio && track.kind==='audio') ){
+    //     console.log(track);
+    //     that.localTracks[socketId].push(pc.addTrack(track, that.localStream))
+    //   };
+    // })
+    
+    // pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true })
+    //   .then(d => pc.setLocalDescription(d))
   }
   return {
     addStream: function (stream) {

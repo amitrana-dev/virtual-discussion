@@ -1,6 +1,7 @@
 'use strict'
 
 import Toasted from 'vue-toasted';
+
 (function () {
   var Vue = require('vue')
   Vue.use(Toasted)
@@ -12,6 +13,7 @@ import Toasted from 'vue-toasted';
   
   Vue.component('paginate', require('vuejs-paginate'))
   Vue.component('media-list', require('./components/media-list'))
+  Vue.component('content-list', require('./components/content-list'))
   Vue.component('code-editor', require('./components/code-editor'))
   Vue.component('white-board', require('./components/white-board'))
   Vue.component('video-box',require('./components/video-box'))
@@ -24,9 +26,11 @@ import Toasted from 'vue-toasted';
       isVidAvailable: false,
       isAudioAvailable: false,
       isRecordingAvailable: false,
+      isScreenShared: false,
       showMenu: false,
       showItem: { 'youtube': false, 'media': false, 'content': false },
       youtubeVideoId: '',
+      templateFile: null,
       contentTabs: [],
       socket: null,
       currentTab: null,
@@ -40,7 +44,11 @@ import Toasted from 'vue-toasted';
       mediaList: [],
       isLoadingMedia: false,
       totalMediaPages: 0,
-      currentMediaPage: 1
+      currentMediaPage: 1,
+      contentList: [],
+      isLoadingContent: false,
+      totalContentPages: 0,
+      currentContentPage: 1
     },
     mounted: function () {
       var that = this
@@ -109,11 +117,18 @@ import Toasted from 'vue-toasted';
         that.socket.on('tabremove', function (tabId) {
           that.removeContainer(tabId, true)
         })
+        that.socket.on('tabrename', function (tabId,name) {
+          for (let i = 0; i < that.contentTabs.length; i++) {
+            if (that.contentTabs[i].id === tabId) {
+              that.contentTabs[i]['name']=name;
+              break
+            }
+          }
+        })
         that.socket.on('tabchanged', function (tabId) {
           that.currentTab = tabId
           setTimeout(function(){
             that.handleResize();
-            window.dispatchEvent(new Event('resize'));
           },100)
         })
         that.socket.on('raisehand', function (info) {
@@ -140,12 +155,12 @@ import Toasted from 'vue-toasted';
         })
         that.socket.on('participants', function (peers) {
           addParticipants(peers, true)
-          that.totalParticipants = Object.keys(peers).length
+          that.totalParticipants = Object.keys(that.participants).length
         })
         that.socket.on('peer-connect', function (data) {
           data.user.peerId = data.socketId
           addParticipants(data.user, false)
-          that.totalParticipants += 1
+          that.totalParticipants = Object.keys(that.participants).length
           if (data.user.presenter === true) {
             Vue.toasted.success('Presenter is online!', { position: 'bottom-right' }).goAway(1000)
             that.presenter = data.user
@@ -164,8 +179,8 @@ import Toasted from 'vue-toasted';
           })
           if (peerIdentity) {
             delete that.participants[peerIdentity]
-            that.totalParticipants -= 1
           }
+          that.totalParticipants = Object.keys(that.participants).length
           if (that.presenter === null) return
           if (data.socketId === that.presenter.peerId) {
             Vue.toasted.error('Presenter is gone offline!', { position: 'bottom-right' }).goAway(1000)
@@ -179,12 +194,22 @@ import Toasted from 'vue-toasted';
           that.totalMediaPages = mediaData.total_pages
           that.isLoadingMedia = false
         })
+        that.socket.on('loadcontent', function (contentData) {
+          contentData = JSON.parse(contentData)
+          that.contentList = contentData.contentList
+          that.currentContentPage = contentData.page
+          that.totalContentPages = contentData.total_pages
+          that.isLoadingContent = false
+        })
+        
         if (!bufferDumped) {
           that.socket.emit('dumpbuffer')
           bufferDumped = true
         }
         // load Media files
         that.changeMediaPage(1)
+        // load Content files
+        that.changeContentPage(1)
       })
     },
     methods: {
@@ -192,6 +217,11 @@ import Toasted from 'vue-toasted';
         this.isLoadingMedia = true
         this.currentMediaPage = pageNum
         this.socket.emit('loadmedia', pageNum)
+      },
+      changeContentPage: function (pageNum) {
+        this.isLoadingContent = true
+        this.currentContentPage = pageNum
+        this.socket.emit('loadcontent', pageNum)
       },
       chatWith: function (identity) {
         if (identity !== this.loggedInUser.identity) {
@@ -216,8 +246,21 @@ import Toasted from 'vue-toasted';
           this.toggleMenu(true)
         }
       },
-      drawRemainingTime: function (percentComplete) {
-        var α = (percentComplete * 360) / 100
+      drawRemainingTime: function () {
+        let moment=require('moment')
+        let remainingTimePercent=100;
+        let currentTime=moment();
+        let courseStartTime=moment(this.course.startTime);
+        if(currentTime >= courseStartTime){
+          let duration=moment.duration(courseStartTime.add(this.course.duration,'minutes').diff(currentTime));
+          let remainingDuration=duration.asMinutes();
+          if(remainingDuration > 0){
+            remainingTimePercent=(remainingDuration/this.course.duration) * 100
+          }else{
+            remainingTimePercent=0;
+          } 
+        }
+        var α = (remainingTimePercent * 360) / 100
         α %= 360
         var π = Math.PI; var r = (α * π / 180)
         var x = Math.sin(r) * 125
@@ -231,12 +274,28 @@ import Toasted from 'vue-toasted';
       },
       toggleVideo: function () {
         this.isVidAvailable = !this.isVidAvailable
+        if(this.isVidAvailable){
+          this.isScreenShared=false;
+        }
       },
       toggleAudio: function () {
         this.isAudioAvailable = !this.isAudioAvailable
+        if(this.isAudioAvailable){
+          this.isScreenShared=false;
+        }
       },
       toggleRecording: function () {
         this.isRecordingAvailable = !this.isRecordingAvailable
+      },
+      stopScreenShare: function () {
+        this.isScreenShared = false
+      },
+      toggleScreen: function () {
+        this.isScreenShared = !this.isScreenShared
+        if(this.isScreenShared){
+          this.isVidAvailable=false;
+          this.isAudioAvailable=false;
+        }
       },
       toggleMenu: function (hideMenu) {
         if (hideMenu) {
@@ -244,6 +303,15 @@ import Toasted from 'vue-toasted';
         } else {
           this.showMenu = !this.showMenu
         }
+      },
+      renameTab: function (index,doneRenaming) {
+        this.contentTabs[index]['renaming']=!doneRenaming;
+        if(doneRenaming){
+          this.socket.emit('tabrename', this.contentTabs[index].id,this.contentTabs[index].name);
+        }
+      },
+      doneRenaming: function (index,event) {
+        if(event.key==='Enter')this.renameTab(index,true);
       },
       removeContainer: function (tabId, triggeredByEvent, e) {
         if (tabId === this.currentTab) this.currentTab = null
@@ -280,6 +348,7 @@ import Toasted from 'vue-toasted';
               canvas.setAttribute('width',tab.clientWidth);
             })
           })
+          window.dispatchEvent(new Event('redraw'));
         })
       },
       addItem: function (itemType) {
@@ -306,6 +375,73 @@ import Toasted from 'vue-toasted';
         }
         this.toggleMenu()
       },
+      importTemplate: function () {
+        let that=this;
+        let templateFile = Object.freeze(that.templateFile)
+        that.toggleModel('import');
+        let importingToast=Vue.toasted.info('Importing template <div class="d-flex justify-content-center loader-container"><div class="lds-ripple"><div class="border-dark"></div><div class="border-dark"></div></div></div>',{position: 'bottom-right'});
+        
+        let fReader = new FileReader();
+        fReader.readAsText(templateFile)
+        fReader.onloadend = function(evt) {
+          if (evt.target.readyState == FileReader.DONE) {
+            that.contentTabs=[];
+            that.socket.emit('importtemplate', evt.target.result, function (err) {
+              importingToast.goAway(0);
+              if(err){
+                Vue.toasted.error('Import failed!').goAway(1500);
+                return;  
+              }
+              Vue.toasted.success('Import complete',{position: 'bottom-right'}).goAway(1500);
+              that.templateFile=null
+              document.getElementById('templateFile').nextElementSibling.innerHTML='Choose File';
+            });
+          }
+        };
+      },
+      exportTemplate: function() {
+        this.toggleMenu();
+        let exportingToast=Vue.toasted.info('Exporting template <div class="d-flex justify-content-center loader-container"><div class="lds-ripple"><div class="border-dark"></div><div class="border-dark"></div></div></div>',{position: 'bottom-right'});
+        this.socket.emit('exporttemplate', function (err,fileBuffer) {
+          exportingToast.goAway(0);
+          if(err){
+            Vue.toasted.error('Export failed!').goAway(1500);
+            return;  
+          }
+          Vue.toasted.success('Export complete',{position: 'bottom-right',action: [
+              {
+                text: 'Download',
+                onClick: (e, toast) => {
+                  var element = document.createElement('a');
+                  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(fileBuffer));
+                  element.setAttribute('download', 'template'+require('moment')().format('YMdHmms')+'.vdtmpl');
+                  element.style.display = 'none';
+                  document.body.appendChild(element);
+                  element.click();
+                  document.body.removeChild(element);
+                  toast.goAway(0)
+                }
+              },
+              {
+                text: 'Close',
+                onClick: (e, toast) => {
+                  toast.goAway(0)
+                }
+              }
+            ] 
+          })
+        });
+      },
+      readTemplate: function (e) {
+        let file=e.target.files[0];
+        let filePlaceholder='Choose file';
+        this.templateFile=null;
+        if(file){
+          filePlaceholder=file.name;
+          this.templateFile=file;
+        }
+        e.target.nextElementSibling.innerHTML=filePlaceholder;
+      },
       loadVideo: function () {
         let videoId = Object.freeze(this.youtubeVideoId)
         if (videoId.trim() === '') return
@@ -325,13 +461,36 @@ import Toasted from 'vue-toasted';
         this.toggleModel('media')
         this.socket.emit('tabadd', JSON.stringify(tabItem))
       },
+      loadContent: function (content) {
+        let that=this;
+        let tabId = that.uuidv4()
+        let contentPages={};
+        content.images.forEach(img=>{
+          let pageId=that.uuidv4();
+          contentPages[pageId]={id: pageId, image: img, drawings: []}
+        })
+        let tabItem = { id: tabId, name: 'Content - ' + content.title, type: 'content', content: contentPages, contentType: content.type }
+        that.addContainer(tabItem)
+        that.toggleModel('content')
+        that.socket.emit('tabadd', JSON.stringify(tabItem))
+      },
       addContainer: function (tabItem) {
+        tabItem.renaming=false;
+        if(tabItem.type==='content') tabItem.currentPage=1;
         this.contentTabs.push(tabItem)
         this.currentTab = tabItem.id
         this.handleResize()
       },
       setCurrentTab: function (tabId) {
         let that=this;
+        if(tabId !== that.currentTab){
+          for (let i = 0; i < that.contentTabs.length; i++) {
+            if (that.contentTabs[i].id === that.currentTab) {
+              that.renameTab(i,true);
+              break
+            }
+          }
+        }
         that.currentTab = tabId
         that.socket.emit('tabchanged', tabId)
         setTimeout(function(){
@@ -347,7 +506,7 @@ import Toasted from 'vue-toasted';
         this.socket.emit('raisehand')
         Vue.toasted.success('Request has been sent to presenter!', { position: 'bottom-right' }).goAway(1500)
       },
-      toggleFullscreen: function () {
+      toggleFullscreen: function (elemId) {
         var isInFullScreen = (document.fullscreenElement && document.fullscreenElement !== null) ||
         (document.webkitFullscreenElement && document.webkitFullscreenElement !== null) ||
         (document.mozFullScreenElement && document.mozFullScreenElement !== null) ||
@@ -363,7 +522,7 @@ import Toasted from 'vue-toasted';
             document.msExitFullscreen()
           }
         } else {
-          let docElm = document.getElementById('discussion_board')
+          let docElm = document.getElementById(elemId)
           if (docElm.requestFullscreen) {
             docElm.requestFullscreen()
           } else if (docElm.mozRequestFullScreen) {

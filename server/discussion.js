@@ -1,6 +1,7 @@
 'use strict'
 const MYSQL=require('mysql')
 const CONFIG=require('./config')
+const MOMENT=require('moment')
 const CONN = MYSQL.createConnection({
   host     : CONFIG.MYSQL_HOST,
   port     : CONFIG.MYSQL_PORT,
@@ -16,7 +17,7 @@ var Discussion = function () {
           Test Code for now
         */
         if(discussionId > 20 ) reject(new Error('Ooops!!! Wrong discussion maybe?'))
-        resolve({id: discussionId,title: 'Jesus-101 ' + Math.random().toString(36).substring(4)});
+        resolve({id: discussionId,title: 'Jesus-101 ' + Math.random().toString(36).substring(4),startTime: new Date(),duration: 60});
       // CONN.query('SELECT C.id,C.title FROM courses as C WHERE C.id=? LIMIT 1',[discussionId], function (error, results, fields) {
       //  if(error) reject(error)
       //  resolve(results[0]);
@@ -25,50 +26,13 @@ var Discussion = function () {
     }).then((discussion)=>{
       return {
         id: discussion.id,
-        title: discussion.title
+        title: discussion.title,
+        startTime: discussion.startTime,
+        duration: discussion.duration 
       }
     })
   }
   function initDiscussion (redis, socket, mapSocketToDiscussion, user) {
-    socket.on('tabadd', function (tabItem) {
-      let discussionId = mapSocketToDiscussion[socket.id]
-      if (CONFIG.DEBUG) { console.log('tabadd ' + discussionId + ' ' + tabItem) }
-      redis.hget('workplace', discussionId, (err, workplace) => {
-        if (err && CONFIG.DEBUG) console.warn(err)
-        if (workplace) {
-          socket.to(discussionId).emit('tabadd', tabItem)
-          tabItem = JSON.parse(tabItem)
-          workplace = JSON.parse(workplace)
-          if (!workplace['tabs']) workplace['tabs'] = []
-          workplace['tabs'].push(tabItem)
-          workplace['settings'][tabItem.id] = { 'ops': [] }
-          redis.hset('workplace', discussionId, JSON.stringify(workplace))
-        }
-      })
-    })
-    socket.on('tabremove', function (tabId) {
-      let discussionId = mapSocketToDiscussion[socket.id]
-      if (CONFIG.DEBUG) { console.log('tabremove ' + discussionId + ' ' + tabId) }
-      redis.hget('workplace', discussionId, (err, workplace) => {
-        if (err && CONFIG.DEBUG) console.warn(err)
-        
-        if (workplace) {
-          socket.to(discussionId).emit('tabremove', tabId)
-          workplace = JSON.parse(workplace)
-          if (!workplace['tabs']) workplace['tabs'] = []
-          let tabIndex = -1
-          for (let i = 0; i < workplace['tabs'].length; i++) {
-            if (workplace['tabs'][i]['id'] === tabId) {
-              tabIndex = i
-              break
-            }
-          }
-          if (tabIndex !== -1) workplace['tabs'].splice(tabIndex, 1)
-          delete workplace['settings'][tabId]
-          redis.hset('workplace', discussionId, JSON.stringify(workplace))
-        }
-      })
-    })
     socket.on('editorchange', function (delta, tabId) {
       let discussionId = mapSocketToDiscussion[socket.id]
       if (CONFIG.DEBUG) { console.log('editorchange ' + discussionId + ' ' + delta) }
@@ -113,12 +77,6 @@ var Discussion = function () {
       let discussionId = mapSocketToDiscussion[socket.id]
       if (CONFIG.DEBUG) { console.log('editorchange_cursor ' + discussionId + '  : ' + curPos) }
       socket.to(discussionId).emit('editorchange_cursor', curPos, tabId)
-    })
-
-    socket.on('tabchanged', function (tabId) {
-      let discussionId = mapSocketToDiscussion[socket.id]
-      if (CONFIG.DEBUG) { console.log('tabchanged ' + tabId) }
-      socket.to(discussionId).emit('tabchanged', tabId)
     })
 
     socket.on('editorclear_buffer', function (tabId) {

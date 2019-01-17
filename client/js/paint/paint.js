@@ -69,8 +69,8 @@ module.exports=(...args)=>{
 		Controls.prototype.constructors = {};
 
 		Controls.prototype.constructors.button = function createButton (control) {
-			var input = document.createElement("div");
-			input.className = (control.classAppend || "") + "control-button";
+			var input = document.createElement("button");
+			input.className = (control.classAppend || "") + "control-button btn rounded-0 btn-sm";
 
 			if (control.value)
 				input.value = control.value;
@@ -6058,6 +6058,7 @@ module.exports=(...args)=>{
 			this.local.redrawOnce();
 
 			this.redrawPaths();
+			this.drawImage();
 			this.redrawLocals();
 			this.redrawFrames();
 		};
@@ -6264,18 +6265,18 @@ module.exports=(...args)=>{
 
 			this.paths = {};
 			this.localUserPaths = [];
+			this.localDrawings = [];
 			this.publicdrawings = [];
 
-			this.goto(0, 0);
+			//this.goto(0, 0, true);
 		};
 
-		Paint.prototype.goto = function goto (worldX, worldY) {
+		Paint.prototype.goto = function goto (worldX, worldY, dontTriggerEvent) {
 			if (typeof worldX !== "number") console.warn("worldX in goto was not a number!");
 			if (typeof worldY !== "number") console.warn("worldY in goto was not a number!");
 
 			if (worldX !== worldX) console.warn("worldX was NaN");
 			if (worldY !== worldY) console.warn("worldY was NaN");
-
 			// Move both local and public tiledcanvas and set all canvas leftTopX/Y properties
 			this.background.goto(worldX, worldY);
 			this.local.goto(worldX, worldY);
@@ -6288,11 +6289,12 @@ module.exports=(...args)=>{
 
 			this.redrawPaths();
 			this.redrawFrames();
-			this.dispatchEvent({
-				type: "move",
-				leftTopX: worldX,
-				leftTopY: worldY
-			});
+			if(!dontTriggerEvent)
+				this.dispatchEvent({
+					type: "move",
+					leftTopX: worldX,
+					leftTopY: worldY
+				});
 		};
 
 		Paint.prototype.finalizeAll = function finalizeAll (amountToKeep) {
@@ -6496,7 +6498,16 @@ module.exports=(...args)=>{
 				this._framesHaveBeenDrawn = true;
 			}
 		};
-
+		Paint.prototype.addBackgroundImage = function addImage (image) {
+			this.backgroundImage=image;
+			this.drawDrawing("background", {type: 'bgImage',image: image});
+		};
+		Paint.prototype.drawImage = function drawImage (){
+			if(!this.backgroundImage) return;
+			// Force the redrawing of locals in this frame
+			this.drawDrawing.bind({type: 'bgImage',image: this.backgroundImage}, "background")
+			this.background.redrawOnce();
+		};
 		Paint.prototype.drawFrame = function drawFrame (frame, framesContext) {
 			// TODO: Optimization possibility: only draw frames that are in vision
 			if (frame.disabled) return;
@@ -6526,6 +6537,11 @@ module.exports=(...args)=>{
 			}
 		};
 
+		Paint.prototype.drawImageTiledCanvas = function drawImageTiledCanvas (image, ctx, tiledCanvas) {
+			ctx.drawImage(this, ctx.canvas.width / 2 - imgWidth / 2, ctx.canvas.height / 2 - img.height / 2, imgWidth, imgHeight);
+			tiledCanvas.drawingRegion(minX, minY, maxX, maxY, path.size);
+			tiledCanvas.execute();
+		};
 		Paint.prototype.drawPathTiledCanvas = function drawPathTiledCanvas (path, ctx, tiledCanvas) {
 			var minX = path.points[0][0],
 			    minY = path.points[0][1],
@@ -6573,7 +6589,7 @@ module.exports=(...args)=>{
 			ctx.beginPath();
 			var x = path.points[0][0] - this.public.leftTopX,
 			    y = path.points[0][1] - this.public.leftTopY;
-			ctx.moveTo(x * this.public.zoom, y * this.public.zoom + this.FIX_CANVAS_PIXEL_SIZE);
+			ctx.moveTo(x * this.local.zoom, y * this.local.zoom + this.FIX_CANVAS_PIXEL_SIZE);
 
 			var minX = Infinity;
 			var minY = Infinity;
@@ -6584,7 +6600,7 @@ module.exports=(...args)=>{
 			for (var pointId = 1; pointId < path.points.length; pointId++) {
 				var x = path.points[pointId][0] - this.public.leftTopX,
 				    y = path.points[pointId][1] - this.public.leftTopY;
-				ctx.lineTo(x * this.public.zoom, y * this.public.zoom + this.FIX_CANVAS_PIXEL_SIZE);
+				ctx.lineTo(x * this.local.zoom, y * this.local.zoom + this.FIX_CANVAS_PIXEL_SIZE);
 				if (x < minX) minX = x;
 				if (x > maxX) maxX = x;
 			}
@@ -6606,7 +6622,7 @@ module.exports=(...args)=>{
 				ctx.strokeStyle = path.color.toRgbString();
 			}
 
-			ctx.lineWidth = path.size * this.public.zoom;
+			ctx.lineWidth = path.size * this.local.zoom;
 
 			ctx.lineJoin = "round";
 			ctx.lineCap = "round";
@@ -6668,12 +6684,10 @@ module.exports=(...args)=>{
 			this.redrawFrames();
 		};
 
-		Paint.prototype.undoManually = function undoManually () {
+		Paint.prototype.undo = function undo (dontTriggerEvent) {
 			this.localDrawings.pop();
 			this.redrawLocals();
-		};
-		Paint.prototype.undo = function undo () {
-			this.undoManually();
+			if(!dontTriggerEvent)
 			this.dispatchEvent({
 				type: "undo"
 			});
@@ -6776,10 +6790,10 @@ module.exports=(...args)=>{
 		};
 
 		// Functions for the current user path (user path = path we are drawing)
-		Paint.prototype.addUserPath = function addUserPath () {
+		Paint.prototype.addUserPath = function addUserPath (color) {
 			this.localUserPaths.push({
 				type: "path",
-				color: this.current_color,
+				color: color ||this.current_color,
 				size: this.current_size
 			});
 			//this.drawPath(this.localUserPaths[this.localUserPaths.length -1]);
@@ -6972,7 +6986,7 @@ module.exports=(...args)=>{
 				name: "grab",
 				type: "button",
 				html: "i",
-				place: "left",
+				place: "top",
 				elemClass: "fa fa-hand-rock",
 				title: "Change tool to grab",
 				value: "grab",
@@ -7013,6 +7027,15 @@ module.exports=(...args)=>{
 				title: "Change tool to text",
 				value: "text",
 				action: this.changeTool.bind(this)
+			}, {
+				name: "eraser",
+				type: "button",
+				html: "i",
+				place: "left",
+				elemClass: "fa fa-eraser",
+				title: "Change tool to eraser",
+				value: "eraser",
+				action: this.changeTool.bind(this)
 			},/* {
 				name: "picker",
 				type: "button",
@@ -7022,22 +7045,12 @@ module.exports=(...args)=>{
 				value: "picker",
 				action: this.changeTool.bind(this)
 			}, */{
-				name: "zoom",
-				type: "button",
-				html: "i",
-				place: "top",
-				elemClass: "fas fa-search",
-				title: "Drag tool to zoom in/out",
-				value: "zoom",
-				action: this.changeTool.bind(this)
-			}, {
 				name: "undo",
 				type: "button",
 				html: "i",
 				place: "left",
 				elemClass: "fas fa-undo",
 				title: "Undo drawing",
-				value: "undo",
 				action: this.undo.bind(this)
 			},/*{
 				name: "select",
@@ -7065,6 +7078,24 @@ module.exports=(...args)=>{
 				value: 5,
 				title: "Change the size of the tool",
 				action: this.changeToolSize.bind(this)
+			}, {
+				name: "zoom-in",
+				type: "button",
+				html: "i",
+				place: "top",
+				elemClass: "fas fa-search-plus",
+				title: "Drag tool to zoom in/out",
+				value: 1.2,
+				action: this.zoom.bind(this)
+			}, {
+				name: "zoom-out",
+				place: "top",
+				type: "button",
+				html: "i",
+				elemClass: "fas fa-search-minus",
+				title: "Reset zoom",
+				value: 1 / 1.2,
+				action: this.zoom.bind(this)
 			},/* {
 				name: "zoom-in",
 				type: "button",
@@ -7073,14 +7104,6 @@ module.exports=(...args)=>{
 				title: "Zoom in",
 				value: 1.2,
 				action: this.zoom.bind(this)
-			}, {
-				name: "zoom-reset",
-				type: "button",
-				html: "i",
-				elemClass: "fas fa-search",
-				title: "Reset zoom",
-				value: 1,
-				action: this.zoomAbsolute.bind(this)
 			}, {
 				name: "zoom-out",
 				type: "button",
@@ -7104,19 +7127,26 @@ module.exports=(...args)=>{
 			}*/];
 		};
 
-		Paint.prototype.zoom = function zoom (zoomFactor) {
-			this.zoomAbsolute(this.public.zoom * zoomFactor);
+		Paint.prototype.zoom = function zoom (zoomFactor, dontTriggerEvent) {
+			
+			if(!dontTriggerEvent)
+			this.dispatchEvent({
+				type: "zoom",
+				zoomFactor: zoomFactor
+			});
+
+			this.zoomAbsolute(this.local.zoom * zoomFactor,!dontTriggerEvent);
 		};
 
 		Paint.prototype.zoomToPoint = function zoomToPoint(zoomFactor, pointX, pointY){
 			if((zoomFactor>0.98)&&(zoomFactor<1.02)) zoomFactor=1;
 			if (zoomFactor < 0.1) zoomFactor = 0.1;
 			
-			pointX = this.public.leftTopX + (pointX / this.public.zoom);
-			pointY = this.public.leftTopY + (pointY / this.public.zoom);
+			pointX = this.local.leftTopX + (pointX / this.local.zoom);
+			pointY = this.local.leftTopY + (pointY / this.local.zoom);
 			
-			var ratioX = (pointX - this.public.leftTopX) / (this.canvasArray[0].width / this.public.zoom);
-			var ratioY = (pointY - this.public.leftTopY) / (this.canvasArray[0].height / this.public.zoom);
+			var ratioX = (pointX - this.local.leftTopX) / (this.canvasArray[0].width / this.local.zoom);
+			var ratioY = (pointY - this.local.leftTopY) / (this.canvasArray[0].height / this.local.zoom);
 			
 			var newX = pointX - ((ratioX * this.canvasArray[0].width) / zoomFactor);
 			var newY = pointY - ((ratioY * this.canvasArray[0].height) / zoomFactor);
@@ -7126,23 +7156,21 @@ module.exports=(...args)=>{
 				newY=Math.round(newY)
 			}
 			
-			this.public.absoluteZoom(zoomFactor);
-			this.background.absoluteZoom(zoomFactor);
 			this.local.absoluteZoom(zoomFactor);
-
-			this.goto(newX, newY);
+			this.background.absoluteZoom(zoomFactor);
+			
+			this.goto(newX, newY,!dontTriggerEvent);
 
 			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
 			this.redrawPaths();
 			this.redrawFrames();
 		}
 
-		Paint.prototype.zoomAbsolute = function zoomAbsolute (zoomFactor) {
+		Paint.prototype.zoomAbsolute = function zoomAbsolute (zoomFactor, dontTriggerEvent) {
 			if((zoomFactor>0.98)&&(zoomFactor<1.02)) zoomFactor=1;
 			if (zoomFactor < 0.1) zoomFactor = 0.1;
-			
-			var currentMiddleX = this.public.leftTopX + this.canvasArray[0].width / this.public.zoom / 2;
-			var currentMiddleY = this.public.leftTopY + this.canvasArray[0].height / this.public.zoom / 2;
+			var currentMiddleX = this.local.leftTopX + this.canvasArray[0].width / this.local.zoom / 2;
+			var currentMiddleY = this.local.leftTopY + this.canvasArray[0].height / this.local.zoom / 2;
 
 			var newX = currentMiddleX - this.canvasArray[0].width / zoomFactor / 2;
 			var newY = currentMiddleY - this.canvasArray[0].height / zoomFactor / 2;
@@ -7152,11 +7180,10 @@ module.exports=(...args)=>{
 				newY=Math.round(newY)
 			}
 
-			this.public.absoluteZoom(zoomFactor);
-			this.background.absoluteZoom(zoomFactor);
 			this.local.absoluteZoom(zoomFactor);
-
-			this.goto(newX, newY);
+			this.background.absoluteZoom(zoomFactor);
+			
+			if(dontTriggerEvent) this.goto(newX, newY);
 
 			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
 			this.redrawPaths();
@@ -7588,6 +7615,62 @@ module.exports=(...args)=>{
 					}
 				}
 			},
+			eraser: function eraser (paint, event, type) {
+				if (event == "remove") {
+					delete paint.lastMovePoint;
+					delete paint.lockcolor;
+					delete paint.brushing;
+					return;
+				}
+				paint.lastMovePoint = paint.lastMovePoint || [0, 0];
+
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+				if (event.type == "mousedown" || event.type == "touchstart") {
+					paint.brushing = true;
+					paint.addUserPath(new tinycolor('white'));
+					paint.addUserPathPoint([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+					                        Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
+
+					// Clear the previous mouse dot
+					paint.effectsCanvasCtx.clearRect(paint.lastMovePoint[0] - paint.current_size * paint.local.zoom * 2, paint.lastMovePoint[1] - paint.current_size * paint.local.zoom * 2, paint.current_size * paint.local.zoom * 4, paint.current_size * paint.local.zoom * 4);
+
+				}
+
+				if (event.type == "mouseup" || event.type == "touchend" || event.type == "mouseleave") {
+					if(paint.brushing) paint.endUserPath();
+					paint.brushing = false;
+				}
+
+				if (event.type == "mousemove" || event.type == "touchmove") {
+					// If we are brushing we don't need to draw a preview
+					if (!this.brushing) {
+						// Clear the previous mouse dot
+						paint.effectsCanvasCtx.clearRect(paint.lastMovePoint[0] - paint.current_size * paint.local.zoom * 2, paint.lastMovePoint[1] - paint.current_size * paint.local.zoom * 2, paint.current_size * paint.local.zoom * 4, paint.current_size * paint.local.zoom * 4);
+
+						// Draw the current mouse position
+						var context = paint.effectsCanvasCtx;
+						context.beginPath();
+						context.arc(scaledCoords[0], scaledCoords[1], (paint.current_size * paint.local.zoom) / 2, 0, 2 * Math.PI, true);
+
+						context.fillStyle = "white";
+						
+						context.fill();
+						
+						// Save the last move point for efficient clearing
+						paint.lastMovePoint[0] = scaledCoords[0];
+						paint.lastMovePoint[1] = scaledCoords[1];
+					}
+
+
+					// If the last brush point is set we are currently drawing
+					if (paint.brushing) {
+						paint.addUserPathPoint([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+					                            Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
+					}
+				}
+			},
 			picker: function picker (paint, event) {
 				if (event == "remove") {
 					delete paint.picking;
@@ -7853,6 +7936,17 @@ module.exports=(...args)=>{
 					tiledCanvas.executeNoRedraw();
 				}
 			},
+			eraser: function (context, drawing, tiledCanvas) {
+				context.beginPath();
+				context.arc(drawing.x, drawing.y, drawing.size, 0, 2 * Math.PI, true);
+				context.fillStyle = 'white';
+				context.fill();
+
+				if (tiledCanvas) {
+					tiledCanvas.drawingRegion(drawing.x, drawing.y, drawing.x, drawing.y, drawing.size);
+					tiledCanvas.executeNoRedraw();
+				}
+			},
 			block: function (context, drawing, tiledCanvas) {
 				context.fillStyle = drawing.color.toRgbString();
 				context.fillRect(drawing.x, drawing.y, drawing.size, drawing.size);
@@ -7886,11 +7980,34 @@ module.exports=(...args)=>{
 				context.arc(drawing.x1, drawing.y1, circleRadius, 0, 2 * Math.PI, true);
 				context.fillStyle = drawing.color.toRgbString();
 				context.fill();
-				
 				if (tiledCanvas) {
-					tiledCanvas.drawingRegion(drawing.x, drawing.y, drawing.x1, drawing.y1, drawing.size);
+					let topLeftX=drawing.x1-circleRadius;
+					let topLeftY=drawing.y1-circleRadius;
+					let bottomRightX=drawing.x1+circleRadius;
+					let bottomRightY=drawing.y1+circleRadius;
+					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
+			},
+			bgImage: function (context, drawing, tiledCanvas){
+				if(!drawing.image) return;
+				var img = new Image();
+				img.onload = function() {
+					tiledCanvas.clearAll();
+					let imgWidth=img.width;
+					let imgHeight=img.height;
+					let topLeftX=50;
+					let topLeftY=50;
+					let bottomRightX=topLeftX+imgWidth;
+					let bottomRightY=topLeftY+imgHeight;
+					context.drawImage(this, topLeftX, topLeftY, imgWidth, imgHeight);
+					if (tiledCanvas) {
+						tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, 0);
+						tiledCanvas.executeNoRedraw();
+						tiledCanvas.redrawOnce();
+					}
+				};
+				img.src = drawing.image;
 			},
 			path: function (context, drawing, tiledCanvas) {
 				this.drawPath(drawing, context, tiledCanvas);
