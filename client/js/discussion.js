@@ -201,9 +201,11 @@ import Toasted from 'vue-toasted';
           that.totalContentPages = contentData.total_pages
           that.isLoadingContent = false
         })
-        
+        console.log('bufferDumped',bufferDumped);
         if (!bufferDumped) {
-          that.socket.emit('dumpbuffer')
+          setTimeout(function(){
+            that.socket.emit('dumpbuffer')
+          },100)
           bufferDumped = true
         }
         // load Media files
