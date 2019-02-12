@@ -52,7 +52,11 @@ var Whiteboard = function () {
         
         if (workplace) {
           workplace=initWorkPlace(workplace, tabId, typeOfBoard, pageId);
-          workplace[typeOfBoard][tabId]['pages'][pageId]['currentPos'] = event
+          if(typeOfBoard==='content'){
+            workplace[typeOfBoard][tabId]['pages'][pageId]['currentPos'] = event
+          }else{
+            workplace[typeOfBoard][tabId]['currentPos'] = event
+          }
           redis.hset('workplace', discussionId, JSON.stringify(workplace))
         }
       })
@@ -66,7 +70,11 @@ var Whiteboard = function () {
         
         if (workplace) {
           workplace=initWorkPlace(workplace, tabId, typeOfBoard, pageId);
-          workplace[typeOfBoard][tabId]['pages'][pageId]['zoom'] = event
+          if(typeOfBoard==='content'){
+            workplace[typeOfBoard][tabId]['pages'][pageId]['zoom'] = event
+          }else{
+            workplace[typeOfBoard][tabId]['zoom'] = event
+          }
           redis.hset('workplace', discussionId, JSON.stringify(workplace))
         }
       })

@@ -68,7 +68,7 @@ var Utility = function () {
         }
       }, 100)
     }
-    socket.on('dumpbuffer', function () {
+    socket.on('dumpbuffer', function (withOutChat) {
       let discussionId = mapSocketToDiscussion[socket.id]
       if (CONFIG.DEBUG) { console.log('dumpbuffer ' + discussionId) }
       redis.hget('workplace', discussionId, (err, workplace) => {
@@ -77,7 +77,7 @@ var Utility = function () {
         }
         if (workplace) {
           workplace= JSON.parse(workplace);
-          loadWorkspace(workplace, true)
+          loadWorkspace(workplace, withOutChat)
         }
       })
     })
@@ -189,13 +189,14 @@ var Utility = function () {
         cb(true);
         return;
       }
-      loadWorkspace(fileContent);
+      //loadWorkspace(fileContent);
       redis.hget('workplace', discussionId, (err, workplace) => {
         if (err && CONFIG.DEBUG) console.warn(err)
         if (workplace) {
           workplace = JSON.parse(workplace)
           if(workplace['chat']) fileContent['chat']=workplace['chat'];
-          redis.hset('workplace', discussionId, JSON.stringify(fileContent))
+          redis.hset('workplace', discussionId, JSON.stringify(fileContent));
+          io.sockets.in(discussionId).emit('dumpbuffer');
         }
         cb(null);
       })

@@ -17,7 +17,7 @@ var Discussion = function () {
           Test Code for now
         */
         if(discussionId > 20 ) reject(new Error('Ooops!!! Wrong discussion maybe?'))
-        resolve({id: discussionId,title: 'Jesus-101 ' + Math.random().toString(36).substring(4),startTime: new Date(),duration: 60});
+        resolve({id: discussionId,title: 'Learning-101 ' + Math.random().toString(36).substring(4),startTime: new Date(),duration: 60});
       // CONN.query('SELECT C.id,C.title FROM courses as C WHERE C.id=? LIMIT 1',[discussionId], function (error, results, fields) {
       //  if(error) reject(error)
       //  resolve(results[0]);
