@@ -7,7 +7,7 @@ module.exports={
         pendingOps: {},
         myConnection: null,
         screen: null,
-        isStreamScreen: null
+        localTracks: {audio: null, video: null}
       }
     },
     props: ['isVidAvailable', 'isAudioAvailable','isScreenShared', 'discussionId', 'socket'],
@@ -15,38 +15,37 @@ module.exports={
       toggleStream: function () {
         if (window.stream) {
           window.stream.getVideoTracks().forEach((track) => {
-            track.enabled = this.isStreamScreen || this.isVidAvailable
+            track.enabled = this.isScreenShared || this.isVidAvailable
           })
           window.stream.getAudioTracks().forEach((track) => {
             track.enabled = this.isAudioAvailable
           })
-          this.myConnection.trackChange(this.isAudioAvailable, this.isStreamScreen || this.isVidAvailable)
+          this.myConnection.trackChange(this.isAudioAvailable, this.isScreenShared || this.isVidAvailable)
         }
       },
       fetchStream: function () {
         var that = this
-        if(that.isStreamScreen) window.stream=null;
-        that.toggleStream()
-        if (window.stream == null) {
-          navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        if (this.isVidAvailable || this.isAudioAvailable) {
+          navigator.mediaDevices.getUserMedia({ video: this.isVidAvailable, audio: this.isAudioAvailable })
             .then(that.gotStream).catch(console.log)
         }
       },
       fetchScreen: function () {
-        window.stream=null;
         var that = this
         if(that.isScreenShared){
+          if(window.stream && window.stream.getVideoTracks().length){
+            window.stream.getVideoTracks()[0].stop();
+          }
           that.screen.share();
         }else{
           if(typeof that.screen.leave !== 'undefined') that.screen.leave();
         }
       },
-      gotStream: function (stream, screen) {
+      gotStream: function (stream) {
         let that = this
-        that.isStreamScreen=screen === true
-        window.stream = stream
+        window.stream=stream;
         that.toggleStream()
-        that.$refs.videoObj.srcObject = stream
+        if(stream.getVideoTracks().length) that.$refs.videoObj.srcObject = stream
         that.myConnection.addStream(stream)
       },
       checkOnNoShowVideo: function (socketId, opts) {
@@ -115,7 +114,7 @@ module.exports={
           if (document.getElementById('remoteVid' + socketId)) document.querySelector('.remote-videos').removeChild(document.getElementById('remoteVid' + socketId))
         }
         that.myConnection = require('../rtc-conn')(newVal, (e, socketId) => {
-          console.log('got streams');
+          console.log('got streams',e.streams[0],e.streams[0].getAudioTracks(),e.streams[0].getVideoTracks());
           removeTrack(socketId)
           that.setUpRemoteVideo(e.streams[0], socketId)
         }, (e, socketId) => {
@@ -132,14 +131,14 @@ module.exports={
         };
         that.screen.onaddstream = function(e) {
             if(e.type=='local'){
-              that.gotStream(e.stream, true);
+              that.gotStream(e.stream);
             }else{
               that.setUpRemoteVideo(e.stream,e.userid)
             }
         };
         that.screen.onuserleft = function(userid) {
           if(userid=='self'){
-            window.stream=null
+            //window.stream=null
             that.$emit('screen-share-stopped');
             that.myConnection.trackChange(false,false);
           }else{

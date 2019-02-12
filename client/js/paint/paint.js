@@ -6565,10 +6565,11 @@ module.exports=(...args)=>{
 			ctx.strokeStyle = path.color.toRgbString();
 			ctx.lineWidth = path.size; // Might not be necessary
 
-			ctx.lineJoin = "round";
 			ctx.lineCap = "round";
 
 			ctx.stroke();
+			ctx.closePath();
+
 			tiledCanvas.drawingRegion(minX, minY, maxX, maxY, path.size);
 			tiledCanvas.execute();
 			
@@ -6584,7 +6585,6 @@ module.exports=(...args)=>{
 				this.drawPathTiledCanvas(path, ctx, tiledCanvas);
 				return;
 			}
-
 			// Start on the first point
 			ctx.beginPath();
 			var x = path.points[0][0] - this.public.leftTopX,
@@ -6628,6 +6628,9 @@ module.exports=(...args)=>{
 			ctx.lineCap = "round";
 
 			ctx.stroke();
+			ctx.closePath();
+			ctx.lineJoin = "miter";
+			ctx.lineCap = "butt";
 		};
 
 		Paint.prototype.redrawLocals = function redrawLocals (noclear) {
@@ -6929,6 +6932,7 @@ module.exports=(...args)=>{
 		Paint.prototype.changeTool = function changeTool (tool) {
 			this.exectool("remove");
 			this.current_tool = tool;
+			this.trianglePoints=null;
 			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
 
 			for (var name in this.controls.byName)
@@ -7001,6 +7005,15 @@ module.exports=(...args)=>{
 				value: "line",
 				action: this.changeTool.bind(this)
 			}, {
+				name: "arrow",
+				type: "button",
+				html: "i",
+				place: "left",
+				elemClass: "fas fa-arrow-right",
+				title: "Change tool to arrow",
+				value: "arrow",
+				action: this.changeTool.bind(this)
+			}, {
 				name: "circle",
 				type: "button",
 				html: "i",
@@ -7008,6 +7021,33 @@ module.exports=(...args)=>{
 				elemClass: "fa fa-circle",
 				title: "Change tool to circle",
 				value: "circle",
+				action: this.changeTool.bind(this)
+			}, {
+				name: "ellipse",
+				type: "button",
+				html: "i",
+				place: "left",
+				elemClass: "fas fa-bezier-curve icon-ellipse",
+				title: "Change tool to bezier curve, Double click when finished",
+				value: "ellipse",
+				action: this.changeTool.bind(this)
+			}, {
+				name: "triangle",
+				type: "button",
+				html: "i",
+				place: "left",
+				elemClass: "fa fa-caret-up fa-2x icon-triangle",
+				title: "Change tool to triangle",
+				value: "triangle",
+				action: this.changeTool.bind(this)
+			}, {
+				name: "rhombus",
+				type: "button",
+				html: "i",
+				place: "left",
+				elemClass: "fa fa-stop icon-rhombus",
+				title: "Change tool to rhombus",
+				value: "rhombus",
 				action: this.changeTool.bind(this)
 			}, {
 				name: "brush",
@@ -7480,6 +7520,307 @@ module.exports=(...args)=>{
 					context.fill();			
 				}
 			},
+			arrow: function arrow (paint, event) {
+				if (event == "remove") {
+					delete paint.lastLinePoint;
+					paint.effectsCanvas.style.cursor = "";
+					return;
+				}
+
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+
+				if ((event.type == "mousedown" || event.type == "touchstart") && !paint.lastLinePoint) {
+					paint.lastLinePoint = scaledCoords;
+				}
+
+				if (event.type == "mouseup" || event.type == "touchend") {
+					// If mouseup is on the same point as mousedown we switch behaviour by making
+					// a line between two clicks instead of dragging
+					if (paint.lastLinePoint[0] == scaledCoords[0] && paint.lastLinePoint[1] == scaledCoords[1]) {
+						return;
+					}
+
+					paint.addUserDrawing({
+						type: "arrow",
+						x: Math.round((paint.local.leftTopX + (paint.lastLinePoint[0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
+						y: Math.round((paint.local.leftTopY + (paint.lastLinePoint[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						x1: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						y1: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						size: paint.current_size,
+						color: paint.current_color
+					});
+
+					delete paint.lastLinePoint;
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+				}
+
+				if ((event.type == "mousemove" || event.type == "touchmove") && paint.lastLinePoint) {
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+
+					// TODO refactor this to use drawFunctions
+					var context = paint.effectsCanvasCtx;
+					
+					context.beginPath();
+					context.arc(paint.lastLinePoint[0], paint.lastLinePoint[1], (paint.current_size * paint.local.zoom) / 2, 0, 2 * Math.PI, true);
+					context.closePath();
+					context.fillStyle = paint.current_color.toRgbString();
+					context.fill();
+
+					context.beginPath();
+					context.moveTo(paint.lastLinePoint[0], paint.lastLinePoint[1]);
+					context.lineTo(scaledCoords[0], scaledCoords[1]);			
+					context.strokeStyle = paint.current_color.toRgbString();
+					context.lineWidth = paint.current_size * paint.local.zoom ;
+					context.stroke();
+
+					// context.beginPath();
+					// context.arc(scaledCoords[0], scaledCoords[1], (paint.current_size * paint.local.zoom) / 2, 0, 2 * Math.PI, true);
+					// context.fillStyle = paint.current_color.toRgbString();
+					// context.fill();
+
+					let headlen = 10;
+		      let angle = Math.atan2(scaledCoords[1]-paint.lastLinePoint[1],scaledCoords[0]-paint.lastLinePoint[0]);
+					context.beginPath();
+					context.lineCap = "butt";
+					context.lineJoin = "miter";
+	        context.moveTo(scaledCoords[0], scaledCoords[1]);
+	        context.lineTo(scaledCoords[0]-headlen*Math.cos(angle-Math.PI/7),scaledCoords[1]-headlen*Math.sin(angle-Math.PI/7));
+
+	        //path from the side point of the arrow, to the other side point
+	        context.lineTo(scaledCoords[0]-headlen*Math.cos(angle+Math.PI/7),scaledCoords[1]-headlen*Math.sin(angle+Math.PI/7));
+
+	        //path from the side point back to the tip of the arrow, and then again to the opposite side point
+	        context.lineTo(scaledCoords[0], scaledCoords[1]);
+	        context.lineTo(scaledCoords[0]-headlen*Math.cos(angle-Math.PI/7),scaledCoords[1]-headlen*Math.sin(angle-Math.PI/7));
+
+	        //draws the paths created above
+	        context.strokeStyle = paint.current_color.toRgbString();
+	        context.lineWidth = paint.current_size * paint.local.zoom;
+	        context.stroke();
+	        context.fillStyle = paint.current_color.toRgbString();
+	        context.fill();
+				}
+			},
+			triangle: function triangle (paint, event) {
+				if (event == "remove") {
+					delete paint.lastLinePoint;
+					paint.effectsCanvas.style.cursor = "";
+					return;
+				}
+
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+
+				if ((event.type == "mousedown" || event.type == "touchstart")) {
+					if(!paint.trianglePoints || paint.trianglePoints.length == 3){
+						paint.trianglePoints=[scaledCoords];	
+					}else{
+						paint.trianglePoints.push(scaledCoords);
+						if(paint.trianglePoints.length==3){
+							// Draw final triangle here	
+							paint.addUserDrawing({
+								type: "triangle",
+								x: Math.round((paint.local.leftTopX + (paint.trianglePoints[0][0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
+								y: Math.round((paint.local.leftTopY + (paint.trianglePoints[0][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								x1: Math.round((paint.local.leftTopX + (paint.trianglePoints[1][0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								y1: Math.round((paint.local.leftTopY + (paint.trianglePoints[1][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								x2: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								y2: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								size: paint.current_size,
+								color: paint.current_color
+							});
+							delete paint.trianglePoints;
+							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+						}
+					}
+					
+				}
+
+				if ((event.type == "mousemove" || event.type == "touchmove") && paint.trianglePoints) {
+					
+					if(!paint.trianglePoints) return;
+
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+					// TODO refactor this to use drawFunctions
+					var context = paint.effectsCanvasCtx;
+					if(paint.trianglePoints.length ==1){
+						context.beginPath();
+						context.arc(paint.trianglePoints[0][0], paint.trianglePoints[0][1], 2, 0, 2 * Math.PI, true);
+						context.fillStyle = paint.current_color.toRgbString();
+						context.fill();
+						
+						context.beginPath();
+						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
+						context.lineTo(scaledCoords[0], scaledCoords[1]);			
+						context.strokeStyle = paint.current_color.toRgbString();
+						context.lineWidth = 2 ;
+						context.stroke();
+
+						context.beginPath();
+						context.arc(scaledCoords[0], scaledCoords[1], 2, 0, 2 * Math.PI, true);
+						context.fillStyle = paint.current_color.toRgbString();
+						context.fill();
+					}else{
+						context.beginPath();
+						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
+						context.lineTo(paint.trianglePoints[1][0], paint.trianglePoints[1][1]);			
+						context.lineTo(scaledCoords[0], scaledCoords[1]);			
+						context.strokeStyle = paint.current_color.toRgbString();
+						context.lineWidth = 2 ;
+						context.fill();
+					}
+						
+				}
+			},
+			ellipse: function ellipse (paint, event) {
+				if (event == "remove") {
+					delete paint.lastLinePoint;
+					paint.effectsCanvas.style.cursor = "";
+					return;
+				}
+
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+				if ((event.type == "mousedown" || event.type == "touchstart")) {
+					if(!paint.lastClickedAt) paint.lastClickedAt=new Date();
+					let doubleClick=( (new Date() - paint.lastClickedAt) < 300 );
+					paint.lastClickedAt=new Date();
+
+					if(!paint.trianglePoints){
+						paint.trianglePoints=[
+							scaledCoords
+						];	
+					}else{
+						paint.trianglePoints.push(scaledCoords);
+						
+						if(doubleClick){
+							paint.trianglePoints=paint.trianglePoints.map(function(cords){
+								return [
+									Math.round((paint.local.leftTopX + (cords[0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
+									Math.round((paint.local.leftTopX + (cords[1] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION
+								];
+							});
+							// Draw final triangle here	
+							paint.addUserDrawing({
+								type: "ellipse",
+								points: paint.trianglePoints,
+								size: paint.current_size,
+								color: paint.current_color
+							});
+							delete paint.trianglePoints;
+							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+						}
+					}
+					
+				}
+
+				if (paint.trianglePoints) {
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+					// TODO refactor this to use drawFunctions
+					var context = paint.effectsCanvasCtx;
+					context.beginPath();
+					context.strokeStyle = paint.current_color.toRgbString();
+					context.lineWidth = 2 ;
+					
+					console.log(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
+					
+					context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
+					if(paint.trianglePoints.length ==1){
+						context.lineTo(scaledCoords[0], scaledCoords[1]);
+					}else{
+						for (var i = 1; i < paint.trianglePoints.length - 1; i ++){
+					      let xc = (paint.trianglePoints[i][0] + paint.trianglePoints[i + 1][0]) / 2;
+					      let yc = (paint.trianglePoints[i][1] + paint.trianglePoints[i + 1][1]) / 2;
+					      context.quadraticCurveTo(paint.trianglePoints[i][0], paint.trianglePoints[i][1], xc, yc);
+					  }
+					  // curve through the last two points
+					  context.quadraticCurveTo(paint.trianglePoints[i][0], paint.trianglePoints[i][1], scaledCoords[0],scaledCoords[1]);
+							
+					}
+					context.stroke();
+						
+				}
+			},
+			rhombus: function rhombus (paint, event) {
+				if (event == "remove") {
+					delete paint.lastLinePoint;
+					paint.effectsCanvas.style.cursor = "";
+					return;
+				}
+
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+
+				if ((event.type == "mousedown" || event.type == "touchstart")) {
+					if(!paint.trianglePoints || paint.trianglePoints.length == 3){
+						paint.trianglePoints=[scaledCoords];	
+					}else{
+						paint.trianglePoints.push(scaledCoords);
+						if(paint.trianglePoints.length==3){
+							// Draw final triangle here	
+							paint.addUserDrawing({
+								type: "rhombus",
+								x: Math.round((paint.local.leftTopX + (paint.trianglePoints[0][0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
+								y: Math.round((paint.local.leftTopY + (paint.trianglePoints[0][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								x1: Math.round((paint.local.leftTopX + (paint.trianglePoints[1][0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								y1: Math.round((paint.local.leftTopY + (paint.trianglePoints[1][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								x2: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								y2: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+								size: paint.current_size,
+								color: paint.current_color
+							});
+							delete paint.trianglePoints;
+							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+						}
+					}
+					
+				}
+
+				if ((event.type == "mousemove" || event.type == "touchmove") && paint.trianglePoints) {
+					
+					if(!paint.trianglePoints) return;
+
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+					// TODO refactor this to use drawFunctions
+					var context = paint.effectsCanvasCtx;
+					if(paint.trianglePoints.length ==1){
+						context.beginPath();
+						context.arc(paint.trianglePoints[0][0], paint.trianglePoints[0][1], 2, 0, 2 * Math.PI, true);
+						context.fillStyle = paint.current_color.toRgbString();
+						context.fill();
+						
+						context.beginPath();
+						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
+						context.lineTo(scaledCoords[0], scaledCoords[1]);			
+						context.strokeStyle = paint.current_color.toRgbString();
+						context.lineWidth = 2 ;
+						context.stroke();
+
+						context.beginPath();
+						context.arc(scaledCoords[0], scaledCoords[1], 2, 0, 2 * Math.PI, true);
+						context.fillStyle = paint.current_color.toRgbString();
+						context.fill();
+					}else{
+						var diffX=scaledCoords[0] - paint.trianglePoints[1][0];
+						var diffY=scaledCoords[1] - paint.trianglePoints[1][1];
+				
+						context.beginPath();
+						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
+						context.lineTo(paint.trianglePoints[1][0], paint.trianglePoints[1][1]);			
+						context.lineTo(scaledCoords[0], scaledCoords[1]);			
+						context.lineTo(diffX + paint.trianglePoints[0][0], diffY + paint.trianglePoints[0][1]);
+						context.strokeStyle = paint.current_color.toRgbString();
+						context.lineWidth = 2 ;
+						context.fill();
+					}
+						
+				}
+			},
 			circle: function circle (paint, event) {
 				if (event == "remove") {
 					delete paint.lastLinePoint;
@@ -7557,16 +7898,15 @@ module.exports=(...args)=>{
 					delete paint.brushing;
 					return;
 				}
-
 				paint.lastMovePoint = paint.lastMovePoint || [0, 0];
-
 				// Get the coordinates relative to the canvas
 				var targetCoords = paint.getCoords(event);
 				var scaledCoords = paint.scaledCoords(targetCoords, event);
 				if (event.type == "mousedown" || event.type == "touchstart") {
 					paint.brushing = true;
-					paint.addUserPath();
-					paint.addUserPathPoint([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+					if(!paint.brushStrokes) paint.brushStrokes=[];
+				
+					paint.brushStrokes.push([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 					                        Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
 
 					// Clear the previous mouse dot
@@ -7575,8 +7915,17 @@ module.exports=(...args)=>{
 				}
 
 				if (event.type == "mouseup" || event.type == "touchend" || event.type == "mouseleave") {
-					if(paint.brushing) paint.endUserPath();
+					if(paint.brushing){
+						paint.addUserDrawing({
+							type: "brush",
+							points: paint.brushStrokes,
+							size: paint.current_size,
+							color: paint.current_color
+						});
+					}
 					paint.brushing = false;
+					delete paint.brushStrokes;
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 				}
 
 				if (event.type == "mousemove" || event.type == "touchmove") {
@@ -7599,7 +7948,7 @@ module.exports=(...args)=>{
 						} else {
 							context.fillStyle = paint.current_color.toRgbString();
 						}
-
+						context.closePath()
 						context.fill();
 						
 						// Save the last move point for efficient clearing
@@ -7610,8 +7959,21 @@ module.exports=(...args)=>{
 
 					// If the last brush point is set we are currently drawing
 					if (paint.brushing) {
-						paint.addUserPathPoint([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+						var context = paint.effectsCanvasCtx;
+						paint.brushStrokes.push([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 					                            Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
+						for (var i = 1; i < paint.brushStrokes.length; i ++){
+					  	context.beginPath();
+							context.moveTo(paint.brushStrokes[i-1][0], paint.brushStrokes[i-1][1]);
+							context.lineTo(paint.brushStrokes[i][0], paint.brushStrokes[i][1]);			
+							context.strokeStyle = paint.current_color.toRgbString();
+							context.lineWidth = paint.current_size;
+							context.lineJoin = "round";
+							context.lineCap = "round";
+							context.stroke();
+							context.closePath();
+					  }
 					}
 				}
 			},
@@ -7841,7 +8203,7 @@ module.exports=(...args)=>{
 					} else {
 						context.fillStyle = paint.current_color.toRgbString();
 					}
-		            
+		      context.closePath();      
 					context.fill();
 				}
 			},
@@ -7920,19 +8282,35 @@ module.exports=(...args)=>{
 				}
 			}
 		};
-
 		// Drawfunctions
 		// this = current paint
 
 		Paint.prototype.drawFunctions = {
 			brush: function (context, drawing, tiledCanvas) {
-				context.beginPath();
-				context.arc(drawing.x, drawing.y, drawing.size, 0, 2 * Math.PI, true);
-				context.fillStyle = drawing.color.toRgbString();
-				context.fill();
+				
+				let topLeftX=drawing.points[0][0];
+				let topLeftY=drawing.points[0][1];
+				let bottomRightX=drawing.points[0][0];
+				let bottomRightY=drawing.points[0][1];
+				for (var i = 1; i < drawing.points.length; i ++){
+			  	context.beginPath();
+					context.moveTo(drawing.points[i-1][0], drawing.points[i-1][1]);
+					context.lineTo(drawing.points[i][0], drawing.points[i][1]);			
+					context.strokeStyle = drawing.color.toRgbString();
+					context.lineWidth = drawing.size ;
+					context.lineCap = "round";
+					context.stroke();
+					context.closePath();
 
+			    topLeftX=Math.min(topLeftX,drawing.points[i][0]);
+		      topLeftY=Math.min(topLeftY,drawing.points[i][1]);
+		      bottomRightX=Math.max(bottomRightX,drawing.points[i][0]);
+		      bottomRightY=Math.max(bottomRightY,drawing.points[i][1]);
+			  }
+			 //  context.lineJoin = "miter";
+				// context.lineCap = "butt";
 				if (tiledCanvas) {
-					tiledCanvas.drawingRegion(drawing.x, drawing.y, drawing.x, drawing.y, drawing.size);
+					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
 			},
@@ -7971,6 +8349,116 @@ module.exports=(...args)=>{
 				
 				if (tiledCanvas) {
 					tiledCanvas.drawingRegion(drawing.x, drawing.y, drawing.x1, drawing.y1, drawing.size);
+					tiledCanvas.executeNoRedraw();
+				}
+			},
+			arrow: function (context, drawing, tiledCanvas) {
+				var headlen = 10;
+        var angle = Math.atan2(drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE-drawing.y,drawing.x1-drawing.x);
+
+				context.beginPath();
+				
+				context.strokeStyle = drawing.color.toRgbString();
+				context.lineWidth = drawing.size;
+				context.lineCap = "round";
+				
+				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
+				
+				context.stroke();
+				
+				context.beginPath();
+        context.moveTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
+        context.lineTo(drawing.x1-headlen*Math.cos(angle-Math.PI/7),drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE -headlen*Math.sin(angle-Math.PI/7));
+
+        //path from the side point of the arrow, to the other side point
+        context.lineTo(drawing.x1-headlen*Math.cos(angle+Math.PI/7),drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE-headlen*Math.sin(angle+Math.PI/7));
+
+        //path from the side point back to the tip of the arrow, and then again to the opposite side point
+        context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
+        context.lineTo(drawing.x1-headlen*Math.cos(angle-Math.PI/7),drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE-headlen*Math.sin(angle-Math.PI/7));
+
+        //draws the paths created above
+        context.strokeStyle = drawing.color.toRgbString();
+        context.lineWidth = drawing.size ;
+        context.stroke();
+        context.fillStyle = drawing.color.toRgbString();
+        context.fill();
+
+				if (tiledCanvas) {
+					tiledCanvas.drawingRegion(drawing.x -10 -drawing.size , drawing.y -10 -drawing.size, drawing.x1+10+drawing.size, drawing.y1+10+drawing.size, drawing.size);
+					tiledCanvas.executeNoRedraw();
+				}
+			},
+			triangle: function (context, drawing, tiledCanvas) {
+				context.beginPath();
+
+				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x2, drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE);
+				context.fillStyle = drawing.color.toRgbString();
+				context.lineWidth = 2;
+				
+				context.fill();
+				
+				if (tiledCanvas) {
+					var topLeftX=Math.min(drawing.x,drawing.x1,drawing.x2);
+					var topLeftY=Math.min(drawing.y,drawing.y1,drawing.y2);
+					var bottomRightX=Math.max(drawing.x,drawing.x1,drawing.x2);
+					var bottomRightY=Math.max(drawing.y,drawing.y1,drawing.y2);
+					
+					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
+					tiledCanvas.executeNoRedraw();
+				}
+			},
+			rhombus: function (context, drawing, tiledCanvas) {
+				context.beginPath();
+				var diffX=drawing.x2 - drawing.x1;
+				var diffY=drawing.y2 - drawing.y1;
+				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x2, drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(diffX + drawing.x, diffY + drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+				context.fillStyle = drawing.color.toRgbString();
+				context.lineWidth = 2;
+				
+				context.fill();
+				
+				if (tiledCanvas) {
+					var topLeftX=Math.min(drawing.x,drawing.x1,drawing.x2,diffX);
+					var topLeftY=Math.min(drawing.y,drawing.y1,drawing.y2,diffY);
+					var bottomRightX=Math.max(drawing.x,drawing.x1,drawing.x2,diffX);
+					var bottomRightY=Math.max(drawing.y,drawing.y1,drawing.y2,diffY);
+					
+					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
+					tiledCanvas.executeNoRedraw();
+				}
+			},
+			ellipse: function (context, drawing, tiledCanvas) {
+				context.beginPath();
+				context.strokeStyle = drawing.color.toRgbString();
+				context.moveTo(drawing.points[0][0], drawing.points[0][1]);
+				context.lineWidth = 2 ;
+
+				let topLeftX=drawing.points[0][0];
+				let topLeftY=drawing.points[0][1];
+				let bottomRightX=drawing.points[0][0];
+				let bottomRightY=drawing.points[0][1];
+				for (var i = 1; i < drawing.points.length - 2; i ++){
+			      let xc = (drawing.points[i][0] + drawing.points[i + 1][0]) / 2;
+			      let yc = (drawing.points[i][1] + drawing.points[i + 1][1]) / 2;
+			      topLeftX=Math.min(topLeftX,drawing.points[i][0],xc);
+			      topLeftY=Math.min(topLeftY,drawing.points[i][1],yc);
+			      bottomRightX=Math.max(bottomRightX,drawing.points[i][0],xc);
+			      bottomRightY=Math.max(bottomRightY,drawing.points[i][1],yc);
+			      context.quadraticCurveTo(drawing.points[i][0], drawing.points[i][1], xc, yc);
+			  }
+			  // curve through the last two points
+			  context.quadraticCurveTo(drawing.points[i][0], drawing.points[i][1], drawing.points[i+1][0],drawing.points[i+1][1]);
+				context.stroke();
+
+				if (tiledCanvas) {
+					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
 			},

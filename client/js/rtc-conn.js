@@ -88,30 +88,37 @@ function RTCConnection (socket, onRemoteStreamAdd, onRemoteStreamRemove, onDisco
   })
   that.sendStreamToPeer = (socketId) => {
     if (that.localStream == null) return
+    
+    function fakeAudio(){
+      let ctx = new AudioContext(), oscillator = ctx.createOscillator();
+      let dst = oscillator.connect(ctx.createMediaStreamDestination());
+      oscillator.start();
+      return Object.assign(dst.stream.getAudioTracks()[0], {enabled: false});
+    }
+
     let pc = that.connections[socketId].pc
     let gotVideo=false
     let gotAudio=false
     if(that.localTracks[socketId]){
       that.localTracks[socketId].forEach((sender,index) => {
         if(sender.track.kind === 'video'){
-          console.log('got video');
           gotVideo=true;
-          sender.replaceTrack(that.localStream.getVideoTracks()[0]);
+          if(that.localStream.getVideoTracks().length) sender.replaceTrack(that.localStream.getVideoTracks()[0]);
         }else{
-          console.log('got audio');
           gotAudio=true;
-          sender.replaceTrack(that.localStream.getAudioTracks()[0]);
+          if(that.localStream.getAudioTracks().length) sender.replaceTrack(that.localStream.getAudioTracks()[0]);
         }
       })
+    }else{
+      that.localTracks[socketId]=[]
+      if(that.localStream.getAudioTracks().length <=0){
+        that.localStream.addTrack(fakeAudio());
+      }
+      that.localStream.getTracks().forEach(track=>{
+        that.localTracks[socketId].push(pc.addTrack(track, that.localStream));
+      });
+
     }
-    // if(!gotVideo && !gotAudio) that.localTracks[socketId] = []
-    // if(!gotVideo || !gotAudio) that.localStream.getTracks().forEach(track => {
-    //   if( (!gotVideo && track.kind==='video') || (!gotAudio && track.kind==='audio') ){
-    //     console.log(track);
-    //     that.localTracks[socketId].push(pc.addTrack(track, that.localStream))
-    //   };
-    // })
-    
     // pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true })
     //   .then(d => pc.setLocalDescription(d))
   }

@@ -201,7 +201,10 @@ import Toasted from 'vue-toasted';
           that.totalContentPages = contentData.total_pages
           that.isLoadingContent = false
         })
-        console.log('bufferDumped',bufferDumped);
+        that.socket.on('dumpbuffer', function () {
+          that.contentTabs = []
+          that.socket.emit('dumpbuffer', true);
+        });
         if (!bufferDumped) {
           setTimeout(function(){
             that.socket.emit('dumpbuffer')
@@ -282,9 +285,6 @@ import Toasted from 'vue-toasted';
       },
       toggleAudio: function () {
         this.isAudioAvailable = !this.isAudioAvailable
-        if(this.isAudioAvailable){
-          this.isScreenShared=false;
-        }
       },
       toggleRecording: function () {
         this.isRecordingAvailable = !this.isRecordingAvailable
@@ -296,7 +296,6 @@ import Toasted from 'vue-toasted';
         this.isScreenShared = !this.isScreenShared
         if(this.isScreenShared){
           this.isVidAvailable=false;
-          this.isAudioAvailable=false;
         }
       },
       toggleMenu: function (hideMenu) {
