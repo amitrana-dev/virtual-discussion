@@ -29,6 +29,7 @@ Copy .env-example to new .env file and fill out the settings for mysql/redis and
 Install the dependencies and devDependencies and start the server.
 
 ```sh
+$ sudo apt-get install imagemagick ghostscript poppler-utils
 $ cd virtual-discussion
 $ npm install
 $ npm start

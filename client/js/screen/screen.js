@@ -148,14 +148,16 @@
 
                     callback(stream);
                 }).catch(function(error) {
-                    if (adapter.browserDetails.browser === 'chrome' && location.protocol === 'http:') {
-                        alert('HTTPs is required.');
-                    } else if (adapter.browserDetails.browser === 'chrome') {
-                        alert('Screen capturing is either denied or not supported. Please install chrome extension for screen capturing or run chrome with command-line flag: --enable-usermedia-screen-capturing');
+                    let errMsg='';
+                    // if (adapter.browserDetails.browser === 'chrome' && location.protocol === 'http:') {
+                    //     errMsg='HTTPs is required.';
+                    // } else 
+                    if (adapter.browserDetails.browser === 'chrome') {
+                        errMsg='<p><br>Screen capturing is either denied or not supported.<br>Please <a href="https://chrome.google.com/webstore/detail/screen-capturing/ajhifddimkapgcifgcodmmfdlknahffk">install chrome extension</a> for screen capturing<br>Or run chrome with command-line flag: --enable-usermedia-screen-capturing</p>';
                     } else if (adapter.browserDetails.browser === 'firefox') {
-                        alert(Firefox_Screen_Capturing_Warning);
+                        errMsg=Firefox_Screen_Capturing_Warning;
                     }
-
+                    self.oncaptureerror(errMsg);
                     console.error(error);
                 });
             }, true);

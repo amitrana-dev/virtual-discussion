@@ -46,6 +46,9 @@ import Toasted from 'vue-toasted';
       totalMediaPages: 0,
       currentMediaPage: 1,
       contentList: [],
+      folderList: [],
+      currentFolder: {},
+      showPrivate: null,
       isLoadingContent: false,
       totalContentPages: 0,
       currentContentPage: 1
@@ -170,6 +173,9 @@ import Toasted from 'vue-toasted';
           that.participants = {}
           that.totalParticipants = 0
         })
+        that.socket.on('changepermission', function(action, value){
+          that.loggedInUser.permissions[action]=value;
+        })
         that.socket.on('peer-disconnect', function (data) {
           let peerIdentity
           Object.keys(that.participants).forEach(identity => {
@@ -196,11 +202,23 @@ import Toasted from 'vue-toasted';
         })
         that.socket.on('loadcontent', function (contentData) {
           contentData = JSON.parse(contentData)
+          that.folderList = contentData.folderList
           that.contentList = contentData.contentList
           that.currentContentPage = contentData.page
+          that.currentFolder = contentData.currentFolder
           that.totalContentPages = contentData.total_pages
           that.isLoadingContent = false
         })
+        that.socket.on('folderadded', function(){
+          that.changeContentPage(1);
+        });
+        that.socket.on('fileadded', function () {
+          Vue.toasted.success('File added successfully!', { position: 'bottom-right' }).goAway(1000)
+          that.changeContentPage(1);
+        });
+        that.socket.on('fileaddfailed', function () {
+          Vue.toasted.error('File addition failed!', { position: 'bottom-right' }).goAway(1000)
+        });
         that.socket.on('dumpbuffer', function () {
           that.contentTabs = []
           that.socket.emit('dumpbuffer', true);
@@ -214,7 +232,7 @@ import Toasted from 'vue-toasted';
         // load Media files
         that.changeMediaPage(1)
         // load Content files
-        that.changeContentPage(1)
+        //that.changeContentPage(1)
       })
     },
     methods: {
@@ -226,7 +244,19 @@ import Toasted from 'vue-toasted';
       changeContentPage: function (pageNum) {
         this.isLoadingContent = true
         this.currentContentPage = pageNum
-        this.socket.emit('loadcontent', pageNum)
+        this.socket.emit('loadcontent', pageNum, this.showPrivate, this.currentFolder.id ? this.currentFolder.id : 0)
+      },
+      goBack: function (){
+        if(typeof this.currentFolder.id=='undefined'){
+          this.showPrivate=null;
+          this.contentList=[];
+        }else if(this.currentFolder.parent_id ==0){
+          this.currentFolder={}
+          this.privateContent(this.showPrivate);
+        }else{
+          this.currentFolder={id: this.currentFolder.parent_id}
+          this.changeContentPage(1);
+        }
       },
       chatWith: function (identity) {
         if (identity !== this.loggedInUser.identity) {
@@ -277,9 +307,12 @@ import Toasted from 'vue-toasted';
                  y + ' z'
         return anim
       },
+      createBreakout: function(){
+
+      },
       toggleVideo: function () {
         this.isVidAvailable = !this.isVidAvailable
-        if(this.isVidAvailable){
+        if(this.isVidAvailable && this.isScreenShared){
           this.isScreenShared=false;
         }
       },
@@ -288,6 +321,9 @@ import Toasted from 'vue-toasted';
       },
       toggleRecording: function () {
         this.isRecordingAvailable = !this.isRecordingAvailable
+      },
+      stopRecording: function () {
+        this.isRecordingAvailable = false
       },
       stopScreenShare: function () {
         this.isScreenShared = false
@@ -462,6 +498,24 @@ import Toasted from 'vue-toasted';
         this.toggleModel('media')
         this.socket.emit('tabadd', JSON.stringify(tabItem))
       },
+      changePermission: function (user, actionFor){
+        let that=this;
+        that.participants[user.identity].permissions[actionFor]=!that.participants[user.identity].permissions[actionFor]
+        that.participants=Object.assign({},that.participants);
+        that.socket.emit('changepermission', user.peerId, actionFor, that.participants[user.identity].permissions[actionFor]);
+      },
+      privateContent: function(isPrivate){
+        this.showPrivate=isPrivate;
+        this.changeContentPage(1);
+      },
+      addFolder: function (folderName){
+        this.socket.emit('addfolder', folderName, this.showPrivate, this.currentFolder.id ? this.currentFolder.id : 0);
+      },
+      loadFolder: function (folder) {
+        let that=this;
+        that.currentFolder=folder;
+        that.changeContentPage(1);
+      },
       loadContent: function (content) {
         let that=this;
         let tabId = that.uuidv4()
@@ -470,7 +524,7 @@ import Toasted from 'vue-toasted';
           let pageId=that.uuidv4();
           contentPages[pageId]={id: pageId, image: img, drawings: []}
         })
-        let tabItem = { id: tabId, name: 'Content - ' + content.title, type: 'content', content: contentPages, contentType: content.type }
+        let tabItem = { id: tabId, name: 'Content - ' + content.name, type: 'content', content: contentPages, contentType: content.type }
         that.addContainer(tabItem)
         that.toggleModel('content')
         that.socket.emit('tabadd', JSON.stringify(tabItem))

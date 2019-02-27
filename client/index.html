@@ -12,19 +12,19 @@
     <link rel="stylesheet" href="css/style.css" />
     <title>Virtual Discussion</title>
     <!-- User "token" and "discussion id" will be replaced by query params if same key exist -->
-    <meta key="token" value="HF7646546KUVMY" />
+    <meta key="token" value="5" />
     <meta key="discussion_id" value="hail_lucifer" />
     <meta key="socket_server_url" value="http://localhost:3000" />
   </head>
   <body>
     <div id="discussion_board" class="container-fluid">
-       <div class="d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm nav-bar header-bar">
+       <div class="header-cont d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm nav-bar header-bar">
         <h5 class="my-0 mr-md-auto font-weight-normal">Virtual Discussion on {{course.title}}</h5>
         <nav class="my-2 my-md-0 mr-md-5" id="media-controls">
-          <a class="p-2 text-dark fa" href="javascript:void(0)" title="Record Session" id="toggleRecording" @click="toggleRecording"><i class="fa fa-circle" :class="{'text-danger': isRecordingAvailable}"></i> REC</a>
-          <a class="p-2 fa" href="javascript:void(0)" v-if="loggedInUser && loggedInUser.presenter " title="Share Screen" id="toggleScreen" @click="toggleScreen" :class="{'text-danger': isScreenShared,'text-dark': !isScreenShared}"><i class="fa fa-desktop"></i></a>
-          <a class="p-2 fa" href="javascript:void(0)" title="Toggle Video" id="toggleVideo" @click="toggleVideo" :class="{'text-danger': isVidAvailable,'text-dark': !isVidAvailable}"><i class="fa" :class="{'fa-video': isVidAvailable,'fa-video-slash': !isVidAvailable}"></i></a>
-          <a class="p-2 fa" href="javascript:void(0)" title="Toggle Audio" id="toggleAudio" @click="toggleAudio"  :class="{'text-danger': isAudioAvailable,'text-dark': !isAudioAvailable}"><i class="fa" :class="{'fa-microphone': isAudioAvailable,'fa-microphone-slash': !isAudioAvailable}"></i></a>
+          <a  v-if="loggedInUser && loggedInUser.presenter  && presenter" class="p-2 text-dark fa" href="javascript:void(0)" title="Record Session" id="toggleRecording" @click="toggleRecording"><i class="fa fa-circle" :class="{'text-danger': isRecordingAvailable}"></i> REC</a>
+          <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 fa" href="javascript:void(0)" v-if="loggedInUser && loggedInUser.presenter " title="Share Screen" id="toggleScreen" @click="toggleScreen" :class="{'text-danger': isScreenShared,'text-dark': !isScreenShared}"><i class="fa fa-desktop"></i></a>
+          <a v-if="loggedInUser && (loggedInUser.presenter || loggedInUser.permissions.video)" class="p-2 fa" href="javascript:void(0)" title="Toggle Video" id="toggleVideo" @click="toggleVideo" :class="{'text-danger': isVidAvailable,'text-dark': !isVidAvailable}"><i class="fa" :class="{'fa-video': isVidAvailable,'fa-video-slash': !isVidAvailable}"></i></a>
+          <a v-if="loggedInUser && (loggedInUser.presenter || loggedInUser.permissions.audio)" class="p-2 fa" href="javascript:void(0)" title="Toggle Audio" id="toggleAudio" @click="toggleAudio"  :class="{'text-danger': isAudioAvailable,'text-dark': !isAudioAvailable}"><i class="fa" :class="{'fa-microphone': isAudioAvailable,'fa-microphone-slash': !isAudioAvailable}"></i></a>
         </nav>
         <nav class="my-2 my-md-0 mr-md-3">
           <a class="p-2 text-dark fa" title="Time Record" href="javascript:void(0)">
@@ -33,7 +33,7 @@
               <path :d="drawRemainingTime()" stroke="black" transform="translate(125, 125) scale(.84)"/>
             </svg>
           </a>
-          <a class="p-2 text-dark fa" href="javascript:void(0)" title="Toggle Layout"><i class="fa fa-columns"></i></a>
+          <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 text-dark fa" href="javascript:void(0)" @click="toggleModel('breakout')" title="Create Breakout Room"><i class="fa fa-columns"></i></a>
           <div class="dropdowns-wrapper">
             <div class="dropdown-container">
               <div class="notifications dropdown dd-trigger" @click="showNotification=!showNotification">
@@ -47,16 +47,19 @@
                   <span class="count" id="dd-notifications-count">{{totalParticipants}}</span>
                 </div>
                 <div class="dropdown-body">
-                  <div class="notification new" v-for="user in participants" @click="chatWith(user.identity)">
+                  <div class="notification new" v-for="user in participants">
                     <div class="notification-image-wrapper">
                       <div class="notification-image">
-                        <img :src="user.profileImage" alt="" width="32">
+                        <img :src="user.profileImage" alt="" width="32"  @click="chatWith(user.identity)">
                       </div>
                     </div>
                     <div class="notification-text">
-                       <span class="highlight">{{user.peerId==loggedInUser.peerId ? 'Me' : user.firstName + ' '+ user.firstName}}</span>
+                       <span class="highlight"  @click="chatWith(user.identity)">{{user.peerId==loggedInUser.peerId ? 'Me' : user.firstName + ' '+ user.lastName}}</span>
                        <br>
                        <span v-if="user.presenter" class="badge badge-success">Presenter</span>
+                       <span v-if="!user.presenter && loggedInUser.presenter" @click="changePermission(user,'video')" :class="{'text-danger': user.permissions.video,'text-dark': !user.permissions.video}"><i class="fa" :class="{'fa-video': user.permissions.video,'fa-video-slash': !user.permissions.video}"></i></span>
+                       <span v-if="!user.presenter && loggedInUser.presenter" @click="changePermission(user,'audio')" :class="{'text-danger': user.permissions.audio,'text-dark': !user.permissions.audio}"><i class="fa" :class="{'fa-microphone': user.permissions.audio,'fa-microphone-slash': !user.permissions.audio}"></i></span>
+                       <span v-if="!user.presenter && loggedInUser.presenter" @click="changePermission(user,'edit')" :class="{'text-danger': user.permissions.edit,'text-dark': !user.permissions.edit}"><i class="fa fa-edit"></i></span>
                     </div>
                   </div>
                 </div>
@@ -70,11 +73,11 @@
       </div>
       <div class="d-flex flex-column flex-md-row p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm playground">
         <div class="col-md-3 border left-sidebar col-sm-12">
-          <video-box :socket="socket" @toggle-fullscreen="toggleFullscreen" @screen-share-stopped="stopScreenShare" :is-vid-available="isVidAvailable" :is-screen-shared="isScreenShared" :is-audio-available="isAudioAvailable" :discussion-id="discussionId"></video-box>
+          <video-box :socket="socket" @toggle-fullscreen="toggleFullscreen" @recording-stopped="stopRecording" @screen-share-stopped="stopScreenShare" :is-vid-available="isVidAvailable" :is-screen-shared="isScreenShared" :is-audio-available="isAudioAvailable"  :is-recording-available="isRecordingAvailable" :discussion-id="discussionId"></video-box>
           <chat-box :socket="socket" :logged-in-user="loggedInUser" :participants="participants" ref="chatBox" @chat-group-changed="handleResize"></chat-box>
         </div>
         <div class="col-sm-12 d-xs-block mt-3 d-md-none"></div>
-        <div class="col-md-9 right-sidebar col-sm-12 px-0 px-sm-3">
+        <div class="col-md-9 right-sidebar col-sm-12 px-0 px-sm-3" :class="{'no-edit': !loggedInUser || (!loggedInUser.presenter && !loggedInUser.permissions.edit)}">
           <!-- Tabs nav started -->
           <ul class="nav nav-tabs" id="play-menu">
             <li class="nav-item dropdown">
@@ -109,11 +112,42 @@
               <source :src="item.url"></source>
             </audio>
             <white-board :item="item" v-if="item.type==='whiteboard' || item.type==='content' " :socket="socket"></white-board>
+            <div class="overlay position-absolute"></div>
           </div>
           <!-- Tabs Body ended -->
           <!-- Loader -->
           <div class="modal-backdrop fade show loader" :class="{'d-block': isLoading ,'d-none': !isLoading}"><div class="position-fixed loader-container"><div class="lds-ripple"><div class="border-white"></div><div class="border-white"></div></div></div></div>
           <!-- Models started -->
+          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['breakout'],'d-none': !showItem['breakout']}">
+            <div class="modal-dialog modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">Create breakout room</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('breakout')">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <div class="row">
+                    <div class="col-sm-6">
+                      <h6>Group - 1</h6>
+                      <ul class="group-1">
+                        <li  v-for="user in participants" v-if="!user.presenter">{{user.firstName}}</li>
+                      </ul>
+                    </div>
+                    <div class="col-sm-6">
+                      <h6>Group - 2</h6>
+                      <ul class="group-2"></ul>
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('breakout')">Close</button>
+                  <button type="button" class="btn btn-primary" @click="createBreakout">Create Room</button>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['youtube'],'d-none': !showItem['youtube']}">
             <div class="modal-dialog modal-dialog" role="document">
               <div class="modal-content">
@@ -212,11 +246,11 @@
                   </button>
                 </div>
                 <div class="modal-body">
-                  <p v-if="contentList.length <= 0">No content available</p>
                   <div v-if="isLoadingContent" class="d-flex justify-content-center loader-container"><div class="lds-ripple"><div class="border-dark"></div><div class="border-dark"></div></div></div>
-                  <content-list v-if="!isLoadingContent" :content-list="contentList" @load-content="loadContent"></content-list>
+                  <content-list v-if="!isLoadingContent"  :socket="socket" :current-folder="currentFolder" :show-private="showPrivate" :folder-list="folderList" :content-list="contentList" @add-folder="addFolder" @load-folder="loadFolder" @private-content="privateContent" @load-content="loadContent" @go-back="goBack"></content-list>
+                  <p v-if="contentList.length <= 0 && showPrivate!=null">No content available</p>
                   <paginate
-                    v-if="!isLoadingContent"
+                    v-if="!isLoadingContent && showPrivate!=null"
                     v-model="currentContentPage"
                     :page-count="totalContentPages"
                     :click-handler="changeContentPage"
@@ -274,9 +308,34 @@
       </div>
     </template>
     <template id="content-list">
-      <div class="row content-list" v-if="contentList.length">
-        <div class="content-item col-sm-3" v-for="content in contentList">
-          <a @click="loadContent(content)" href="javascript:void(0)">{{content.title}}</a>
+      <div>
+        <div class="row"  v-if="showPrivate != null">
+          <div class="col-sm-2"><a href="javascript:void(0)" v-on:click="goBack()"><i class="fa fa-arrow-left"></i></a></div>
+          <div class="col-sm-6"><input type="file" placeholder="Upload File" accept="image/*,application/pdf" v-on:change="uploadFile" /></div>
+          <div class="col-sm-4">
+            <div class="input-group">
+              <input type="text" v-model="folderName" class="form-control input-sm" v-on:keyup.13="addFolder" id="folder-name" placeholder="Add folder" aria-label="Add folder">
+              <span class="input-group-append">
+                <button class="btn btn-primary btn-sm" id="folder-submit" v-on:click="addFolder"><i class="fa fa-folder"></i></button>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="row content-list">
+          <div class="content-item col-sm-3" v-if="showPrivate == null">
+            <a href="javascript:void(0)" @click="setPrivate()"><i class="fa fa-folder fa-4 theme-color"></i><br>Private</a>
+          </div>
+          <div class="content-item col-sm-3" v-if="showPrivate == null">
+            <a href="javascript:void(0)" @click="setPublic()"><i class="fa fa-folder fa-4 theme-color"></i><br>Public</a>
+          </div>
+          <div class="content-item col-sm-3" v-if="showPrivate != null && folderList.length" v-for="folder in folderList">
+            <a @click="changeFolder(folder)" href="javascript:void(0)"><i class="fa fa-folder fa-4 theme-color"></i><br>{{folder.name}}</a>
+          </div>
+        </div>
+        <div class="row content-list" v-if="contentList.length">
+          <div class="content-item col-sm-3" v-for="content in contentList">
+            <a @click="loadContent(content)" href="javascript:void(0)" :class="{'pdf-item': content.type=='pdf'}"><i class="fa fa-file-pdf theme-color" v-if="content.type=='pdf'"></i><img :src="content.url" width="150" v-if="content.type=='image'" /><br>{{content.name}}</a>
+          </div>
         </div>
       </div>
     </template>
@@ -284,8 +343,8 @@
       <ul class="chat-list">
         <li class="left clearfix" v-for="chat in messages">
           <span class="chat-img float-left">
-            <img v-if="chat.user.image" :src="chat.user.profileImage" :alt="chat.user.firstName + ' ' + chat.user.lastName" class="rounded" />
-            <img v-if="!chat.user.image || chat.user.image==''" src="http://placehold.it/50/55C1E7/fff&text=U" :alt="chat.user.firstName + ' ' + chat.user.lastName" class="rounded" />
+            <img v-if="chat.user.image" :src="chat.user.profileImage" :alt="chat.user.firstName + ' ' + chat.user.lastName" class="rounded-circle" />
+            <img v-if="!chat.user.image || chat.user.image==''" src="http://placehold.it/50/55C1E7/fff&text=U" :alt="chat.user.firstName + ' ' + chat.user.lastName" class="rounded-circle" />
           </span>
           <div class="chat-body clearfix">
             <div class="header">
@@ -306,7 +365,7 @@
               <ul class="nav nav-tabs chat-bar">
                 
                 <li class="nav-item small" :class="{'d-none': group.hideMe,'d-block': !group.hideMe}" v-for="(group,index) in messageGroups" :key="group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.identity : group.to.identity) : 'common'">
-                  <a class="nav-link active" :class="{'text-info': group.name==currentGroup}" @click="chatWith(group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.identity : group.to.identity) : 'common')">{{group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.firstName : group.to.firstName) : 'General'}}<span v-if="group.newMessage" class="new_message"></span><span v-if="group.name !=='common'"> | <i class="fa fa-times text-black" @click="removeChat(index,$event)"></i></span></a>
+                  <a class="nav-link" :class="{'bg-primary text-white': group.name==currentGroup, 'active': group.name!=currentGroup}" @click="chatWith(group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.identity : group.to.identity) : 'common')">{{group.name !=='common' ? (group.to.identity==loggedInUser.identity ? group.from.firstName : group.to.firstName) : 'General'}}<span v-if="group.newMessage" class="new_message"></span><span v-if="group.name !=='common'"> | <i class="fa fa-times text-black" @click="removeChat(index,$event)"></i></span></a>
                 </li>
               </ul>
               <div class="chat-groups">
@@ -317,7 +376,7 @@
               <div class="input-group">
                 <input type="text" v-model="chatMessage" class="form-control input-sm" v-on:keyup.13="addComment" id="chat-message" placeholder="Type your message here..." aria-label="Type your message here..." aria-describedby="chat-submit">
                 <span class="input-group-append">
-                  <button class="btn btn-primary btn-sm" id="chat-submit" v-on:click="addComment"><i class="fa fa-comment"></i></button>
+                  <button class="btn btn-primary btn-sm" id="chat-submit" v-on:click="addComment"><img src="img/chatarrow.png"></button>
                 </span>
               </div>
             </div>

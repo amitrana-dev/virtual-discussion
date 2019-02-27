@@ -8,9 +8,12 @@ const CONN = MYSQL.createConnection({
   password : CONFIG.MYSQL_PWD,
   database : CONFIG.MYSQL_DB
 });
+const FS= require('fs');
+const PDFImage = require("pdf-image").PDFImage;
+const path = require("path");
 var Utility = function () {
-  function initUtilities (redis, socket, io, mapSocketToDiscussion, user) {
-    function loadWorkspace(workplace, withChat){
+  function initUtilities (redis, socket, io, mapSocketToDiscussion, user, loggedInUser) {
+    function loadWorkspace(workplace, withOutChat){
       if (!workplace['tabs']) workplace['tabs'] = []
       if (!workplace['chat']) workplace['chat'] = {}
       if (!workplace['whiteboard']) workplace['whiteboard'] = {}
@@ -21,7 +24,7 @@ var Utility = function () {
       }
 
       // making chat optional for template
-      if(withChat){
+      if(!withOutChat){
         // dump chat
         Object.keys(workplace['chat']).forEach(group=>{
           if(group.indexOf(user.identity) !== -1 || group=='common'){
@@ -201,6 +204,89 @@ var Utility = function () {
         cb(null);
       })
     });
+    // save the recording of classroom 
+    socket.on('recordingData', function (data,fileName) {
+        let pathExist=FS.existsSync(CONFIG.FILE_STORAGE+ loggedInUser.id);
+        FS.mkdir(CONFIG.FILE_STORAGE+loggedInUser.id,{recursive: true},function(err){
+          if(err && !pathExist){ 
+            console.log(err);
+          }
+          let file=fileName+'.webm';
+          FS.appendFile(CONFIG.FILE_STORAGE+ loggedInUser.id +'/' + file, data, function (err) {
+              if(err){ 
+                console.log(err);
+              }
+              let images=JSON.stringify([file]);
+              let url=file;
+              CONN.query('SELECT  count(1) as file_exist from media_files where name=? ',[file], function (error, results, fields) {
+                if(error){
+                  console.log(error); 
+                }
+                if(results[0].file_exist == 0){
+                  CONN.query('INSERT INTO media_files SET name=?,type=?,user_id=?,is_private=0, url =?, images=? ',[file, 'video', loggedInUser.id, url, images], function (error, results, fields) {
+                    if(error){
+                      console.log(error); 
+                    }
+                  })    
+                }
+              })
+          }); 
+        })
+    });
+    socket.on('add-file', function (folder_id, isPrivate, fileMeta, fileContent) {
+      try{
+        let pathExist=FS.existsSync(CONFIG.FILE_STORAGE+loggedInUser.id);
+        FS.mkdir(CONFIG.FILE_STORAGE+loggedInUser.id,{recursive: true},function(err){
+          if(err && !pathExist){ 
+            console.log(err);
+            return socket.emit('fileaddfailed');
+          }
+          let fileName=new Date().getTime() + fileMeta.name;
+          FS.writeFile(CONFIG.FILE_STORAGE+loggedInUser.id + '/'+fileName, fileContent, function(err) {
+              if(err){ 
+                console.log(err);
+                return socket.emit('fileaddfailed');
+              }
+              let url=fileName;
+              new Promise(function(resolve,reject){
+                console.log(fileMeta.type.indexOf('/pdf'))  ;
+                if(fileMeta.type.indexOf('/pdf') == -1){
+                  return resolve([url]);
+                }
+                var pdfImage = new PDFImage(CONFIG.FILE_STORAGE+loggedInUser.id + '/'+fileName);
+                pdfImage.convertFile().then(images=>{
+                  images=images.map(image=>{ 
+                    return path.basename(image) 
+                  }); 
+                  resolve(images)
+                }).catch(err=>{reject(err)});
+              }).then(function(images){
+                console.log(images);
+                CONN.query('INSERT INTO media_files SET media_category_id=?, name=?,type=?,user_id=?,is_private=?, url =?, images=? ',[folder_id, fileMeta.name, (fileMeta.type.indexOf('/pdf') != -1 ? 'pdf' : 'image'), loggedInUser.id, isPrivate, url, JSON.stringify(images)], function (error, results, fields) {
+                  if(error){
+                    console.log(error); 
+                    return socket.emit('fileaddfailed');
+                  }
+                  socket.emit('fileadded');
+                })
+              }).catch(function(err){
+                console.log(err);
+                return socket.emit('fileaddfailed');
+              });
+          }); 
+            
+        })
+        
+      }catch(ex){
+        console.log(ex);
+        return;
+      }
+    });
+    socket.on('addfolder', function(folderName, isPrivate, folderId){
+      CONN.query('INSERT INTO media_categories SET name=?,parent_id=?,user_id=?,is_private=?',[folderName, folderId, loggedInUser.id, isPrivate], function (error, results, fields) {
+        socket.emit('folderadded');
+      })
+    })
     socket.on('loadmedia',function(pageNum){
       let startRec=(pageNum-1)*20;
       let endRec=pageNum*20;
@@ -258,87 +344,84 @@ var Utility = function () {
         }));
       });
     });
-    socket.on('loadcontent',function(pageNum){
+    socket.on('loadcontent',function(pageNum, isPrivate, folderId){
       let startRec=(pageNum-1)*20;
       let endRec=pageNum*20;
       if (CONFIG.DEBUG) { console.log('loadcontent by ' + socket.id) }
       Promise.all([
         new Promise((resolve,reject)=>{
-          /*
-            Test Code for now
-          */
-          resolve([
-            {
-              type: 'image',
-              title: Math.random().toString(36).substring(4),
-              images: [
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1950&q=80'
-              ]
-            },
-            {
-              type: 'image',
-              title: Math.random().toString(36).substring(4),
-              images: [
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1950&q=80'
-              ]
-            },
-            {
-              type: 'image',
-              title: Math.random().toString(36).substring(4),
-              images: [
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1950&q=80'
-              ]
-            },
-            {
-              type: 'pdf',
-              title: Math.random().toString(36).substring(4),
-              images: [
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1950&q=80',
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=100&q=80',
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=100&q=80'
-              ]
-            },
-            {
-              type: 'doc',
-              title: Math.random().toString(36).substring(4),
-              images: [
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1950&q=80',
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=100&q=80',
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=100&q=80'
-              ]
-            },
-            {
-              type: 'text',
-              title: Math.random().toString(36).substring(4),
-              images: [
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1950&q=80',
-                'https://images.unsplash.com/photo-1513618827672-0d7c5ad591b1?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=100&q=80'
-              ]
-            } 
-          ]);
-          // we will return the images generated by pdf
-          // CONN.query('SELECT M.type,M.title,M.url FROM media_files as M where type not in ('audio','video') LIMIT ?,?',[startRec,endRec], function (error, results, fields) {
-          //  if(error) reject(error)
-          //  resolve(results[0]);
-          // })
+          let query='';
+          let replacements=[];
+          if(isPrivate){
+            query='SELECT C.id, C.name, C.parent_id FROM media_categories as C where C.is_private=1 and C.parent_id=? and C.user_id=?';
+            replacements=[folderId, loggedInUser.id]
+          }else{
+            query='SELECT C.id, C.name, C.parent_id FROM media_categories as C where C.is_private=0 and C.parent_id=?';
+            replacements=[folderId]
+          }
+          CONN.query(query, replacements, function (error, results, fields) {
+           if(error) reject(error)
+           resolve(results);
+          })
         }),
         new Promise((resolve,reject)=>{
-          /*
-            Test Code for now
-          */
-          resolve(10);
-          // CONN.query('SELECT count(*) as total_files FROM media_files where type not in ('audio','video') LIMIT 1', function (error, results, fields) {
-          //  if(error) reject(error)
-          //  let total_files=results[0].total_files;
-          //  resolve(Math.ceil(total_files/20));
-          // })
+          let query='';
+          let replacements=[];
+          if(isPrivate){
+            query='SELECT M.id, M.name,M.user_id, M.type, M.url, M.images FROM media_files as M where M.type IN ("image","pdf") and M.is_private=? and M.media_category_id=? and M.user_id=?';
+            replacements=[isPrivate, folderId, loggedInUser.id]
+          }else{
+            query='SELECT M.id, M.name,M.user_id, M.type, M.url, M.images FROM media_files as M where M.type IN ("image","pdf") and M.is_private=? and M.media_category_id=?';
+            replacements=[isPrivate, folderId]
+          }
+          CONN.query(query, replacements, function (error, results, fields) {
+           if(error) reject(error)
+           results=results.map(function(file){
+            file.url=CONFIG.FILE_URL+file.user_id+'/'+file.url;
+            file.images=JSON.parse(file.images);
+            file.images=file.images.map(function(image){
+              return CONFIG.FILE_URL+file.user_id+'/'+image;
+            });
+            delete file.user_id;
+            return file;
+           })
+           resolve(results);
+          })
+        }),
+        new Promise((resolve,reject)=>{
+          let query='';
+          let replacements=[];
+          if(isPrivate){
+            query='SELECT count(*) as total_files FROM media_files as M where M.type IN ("image","pdf") and M.is_private=? and M.media_category_id=? and M.user_id=?';
+            replacements=[isPrivate, folderId, loggedInUser.id]
+          }else{
+            query='SELECT count(*) as total_files FROM media_files as M where M.type IN ("image","pdf") and M.is_private=? and M.media_category_id=?';
+            replacements=[isPrivate, folderId]
+          }
+          CONN.query(query, replacements, function (error, results, fields) {
+            if(error) reject(error)
+            let total_files=results[0].total_files;
+            resolve(Math.ceil(total_files/20));
+          })
+        }),
+        new Promise((resolve,reject)=>{
+          if(folderId == 0) {
+            resolve({});
+          }else{
+            CONN.query('SELECT C.id, C.name, C.parent_id FROM media_categories as C where C.id=?', [folderId], function (error, results, fields) {
+             if(error) reject(error)
+             resolve(results[0]);
+            })  
+          }
         })
       ]).then((results)=>{
         // identity should be same for any subsequent request.
         socket.emit('loadcontent', JSON.stringify({
           page: pageNum,
-          total_pages: results[1],
-          contentList: results[0]
+          total_pages: results[2],
+          contentList: results[1],
+          folderList: results[0],
+          currentFolder: results[3]
         }));
       });
     });

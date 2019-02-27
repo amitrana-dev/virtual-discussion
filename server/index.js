@@ -9,6 +9,7 @@ const CHAT = require('./chat')()
 const WHITEBOARD = require('./whiteboard')()
 const UTILITY = require('./utility')()
 const CONFIG=require('./config')
+const FS=require('fs')
 
 
 const SERVER = HTTP.createServer(function (req, res) {
@@ -41,7 +42,10 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
     .then((result) => {
       let [discussionInfo,user]=result
       user.peerId=socket.id;
-
+      user.permissions={audio: false, video: false, edit: false};
+      let loggedInUser=Object.assign({},user);
+      delete user.id;
+      
       // Join user to discusison
       socket.join(discussionId)
       
@@ -50,6 +54,22 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
           socket.broadcast.to(peerId).emit('message', data,socket.id);
       });
 
+      socket.on('changepermission',function(peerId, action, value){
+        REDIS.get('participants', (err, participants) => {
+          if (err && CONFIG.DEBUG) console.warn(err)
+          if (participants == null) {
+            participants = {}
+          } else {
+            participants = JSON.parse(participants)
+          }
+          if (!participants[discussionId]) participants[discussionId] = {}
+          participants[discussionId][peerId].permissions[action] = value
+          socket.broadcast.to(peerId).emit('changepermission', action, value);
+          REDIS.set('participants', JSON.stringify(participants), (err, res) => {
+            if (err && CONFIG.DEBUG) console.warn(err)
+          })
+        })
+      }) 
       // send info about connected peers
       socket.to(discussionId).emit('peer-connect',{socketId: socket.id,user: user});
       IO.in(discussionId).clients(function(err,clients){
@@ -129,7 +149,7 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
         // start listening for drawing messages
         WHITEBOARD.init(REDIS, socket, IO, mapSocketToDiscussion, user)
         // start listening for general events
-        UTILITY.init(REDIS, socket, IO, mapSocketToDiscussion, user)
+        UTILITY.init(REDIS, socket, IO, mapSocketToDiscussion, user, loggedInUser)
       })
     }).catch((err) => {
       console.log(err)

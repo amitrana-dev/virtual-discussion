@@ -3252,7 +3252,7 @@ module.exports=(...args)=>{
 		    })(),
 		    replaceInput = [
 		        "<div class='control-button'>",
-		            "<i class='fas fa-square sp-preview-inner'></i>",
+		            "<i class='tool-item tool-colorpicker sp-preview-inner'></i>",
 		        "</div>"
 		    ].join(''),
 		    markup = (function () {
@@ -6991,7 +6991,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "top",
-				elemClass: "fa fa-hand-rock",
+				elemClass: "tool-item tool-grab",
 				title: "Change tool to grab",
 				value: "grab",
 				action: this.changeTool.bind(this)
@@ -7000,7 +7000,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fa fa-slash",
+				elemClass: "tool-item fa fa-slash",
 				title: "Change tool to line",
 				value: "line",
 				action: this.changeTool.bind(this)
@@ -7009,7 +7009,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fas fa-arrow-right",
+				elemClass: "tool-item tool-arrow",
 				title: "Change tool to arrow",
 				value: "arrow",
 				action: this.changeTool.bind(this)
@@ -7018,7 +7018,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fa fa-circle",
+				elemClass: "tool-item tool-circle",
 				title: "Change tool to circle",
 				value: "circle",
 				action: this.changeTool.bind(this)
@@ -7027,7 +7027,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fas fa-bezier-curve icon-ellipse",
+				elemClass: "tool-item tool-pen",
 				title: "Change tool to bezier curve, Double click when finished",
 				value: "ellipse",
 				action: this.changeTool.bind(this)
@@ -7036,7 +7036,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fa fa-caret-up fa-2x icon-triangle",
+				elemClass: "tool-item tool-triangle",
 				title: "Change tool to triangle",
 				value: "triangle",
 				action: this.changeTool.bind(this)
@@ -7045,7 +7045,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fa fa-stop icon-rhombus",
+				elemClass: "tool-item tool-rectangle",
 				title: "Change tool to rhombus",
 				value: "rhombus",
 				action: this.changeTool.bind(this)
@@ -7054,7 +7054,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fa fa-paint-brush",
+				elemClass: "tool-item tool-brush",
 				title: "Change tool to brush",
 				value: "brush",
 				action: this.changeTool.bind(this)
@@ -7063,7 +7063,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fa fa-font",
+				elemClass: "tool-item tool-text",
 				title: "Change tool to text",
 				value: "text",
 				action: this.changeTool.bind(this)
@@ -7072,7 +7072,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fa fa-eraser",
+				elemClass: "tool-item tool-eraser",
 				title: "Change tool to eraser",
 				value: "eraser",
 				action: this.changeTool.bind(this)
@@ -7089,7 +7089,7 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "fas fa-undo",
+				elemClass: "tool-item tool-undo",
 				title: "Undo drawing",
 				action: this.undo.bind(this)
 			},/*{

@@ -8,7 +8,9 @@ module.exports={
   REDIS_PWD   :   process.env.VD_REDIS_PWD || '',
   MYSQL_HOST  :   process.env.VD_MYSQL_HOST || 'localhost',
   MYSQL_PORT  :   process.env.VD_MYSQL_PORT || 3306,
-  MYSQL_USER  :   process.env.VD_MYSQL_USER || 'virt_dis',
-  MYSQL_PWD   :   process.env.VD_MYSQL_PWD || '',
-  MYSQL_DB    :   process.env.VD_MYSQL_DB || 'virt_dis'
+  MYSQL_USER  :   process.env.VD_MYSQL_USER || 'root',
+  MYSQL_PWD   :   process.env.VD_MYSQL_PWD || 'sosweet',
+  MYSQL_DB    :   process.env.VD_MYSQL_DB || 'test',
+  FILE_STORAGE:   process.env.VD_FILE_STORAGE || '/var/www/html/virtual_discussion/client/uploads/',
+  FILE_URL    :   process.env.VD_FILE_URL || 'http://localhost/virtual_discussion/client/uploads/',
 }

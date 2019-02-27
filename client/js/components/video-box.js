@@ -7,10 +7,13 @@ module.exports={
         pendingOps: {},
         myConnection: null,
         screen: null,
+        recording: null,
+        recordingFileName: null,
+        recorder: null,
         localTracks: {audio: null, video: null}
       }
     },
-    props: ['isVidAvailable', 'isAudioAvailable','isScreenShared', 'discussionId', 'socket'],
+    props: ['isVidAvailable', 'isAudioAvailable', 'isRecordingAvailable','isScreenShared', 'discussionId', 'socket'],
     methods: {
       toggleStream: function () {
         if (window.stream) {
@@ -28,6 +31,25 @@ module.exports={
         if (this.isVidAvailable || this.isAudioAvailable) {
           navigator.mediaDevices.getUserMedia({ video: this.isVidAvailable, audio: this.isAudioAvailable })
             .then(that.gotStream).catch(console.log)
+        }else{
+         that.toggleStream() 
+        }
+      },
+      fetchScreenForRecording: function () {
+        var that = this
+        if(that.isRecordingAvailable){
+          if(that.recorder){
+            that.recorder.resume();
+          }else{
+            that.recordingFileName='recording_'+new Date().valueOf();
+            that.recording.share();
+          }
+        }else{
+          if(that.recorder){
+            that.recorder.pause();
+          }else{
+            if(typeof that.recording.leave !== 'undefined') that.recording.leave();  
+          }
         }
       },
       fetchScreen: function () {
@@ -124,6 +146,33 @@ module.exports={
         }, (socketId) => {
           removeTrack(socketId)
         });
+        
+        that.recording = new Screen(newVal.id);
+        that.recorder = null;
+        that.recording.onaddstream = function(e) {
+            try {
+              that.recorder = new MediaRecorder(e.stream, {mimeType : "video/webm"});
+            } catch (e) {
+              console.error('Exception while creating MediaRecorder: ' + e);
+              return;
+            }
+            that.recorder.ondataavailable = (event) => {
+              that.socket.emit('recordingData',event.data,that.recordingFileName);
+            };
+            that.recorder.start(1000);
+        };
+        that.recording.oncaptureerror = function(errMsg) {
+          that.$toasted.error(errMsg, { position: 'bottom-right' }).goAway(5000)
+          that.$emit('recording-stopped');
+        };
+        that.recording.onuserleft = function(userid) {
+          that.$emit('recording-stopped');
+          if(that.recorder){
+            that.recorder.stop();
+            that.recorder=null;
+          }
+        };
+
         that.screen = new Screen(newVal.id);
         that.screen.userid=newVal.id;
         that.screen.openSignalingChannel = function(callback) {
@@ -136,6 +185,11 @@ module.exports={
               that.setUpRemoteVideo(e.stream,e.userid)
             }
         };
+        that.screen.oncaptureerror = function(errMsg) {
+          that.$toasted.error(errMsg, { position: 'bottom-right' }).goAway(5000)
+          that.$emit('screen-share-stopped');
+        };
+        
         that.screen.onuserleft = function(userid) {
           if(userid=='self'){
             //window.stream=null
@@ -155,6 +209,9 @@ module.exports={
       },
       isScreenShared: function(newVal, oldVal){
         this.fetchScreen()
+      },
+      isRecordingAvailable: function(newVal, oldVal){
+        this.fetchScreenForRecording()
       }
     }
   }

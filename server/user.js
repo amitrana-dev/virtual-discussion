@@ -25,6 +25,7 @@ module.exports={
    	}).then((user)=>{
 		  // identity should be same for any subsequent request.
       return {
+        id: user.id,
         identity: MD5(user.id),
         presenter: user.user_type == 1,
         firstName: user.firstname,
