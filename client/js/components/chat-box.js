@@ -78,6 +78,9 @@ module.exports={
     watch: {
       socket: function () {
         var that = this
+        that.socket.on('reconnect', function(){
+          that.messageGroups= [{ name: 'common', messages: [], newMessage: false, hideMe: false }];
+        });
         that.socket.on('chatmessage', (msg, groupName) => {
           let [foundGroup, _] = that.initChatWith(groupName) // eslint-disable-line
           msg = JSON.parse(msg)

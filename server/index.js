@@ -35,25 +35,54 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
   function onConnect (socket) {
     let discussionId = socket.handshake.query['discussion_id']
     let userToken = socket.handshake.query['token']
-    
+    let discussionInfo=null
+    let user=null
+    let loggedInUser=null
     if (CONFIG.DEBUG) { console.log(userToken + ' connected on socket ' + socket.id) }
     
     Promise.all([DISCUSSION.getInfo(discussionId),USER.getUserInfoForDiscussion(userToken,discussionId)])
     .then((result) => {
-      let [discussionInfo,user]=result
+      [discussionInfo,user]=result
       user.peerId=socket.id;
       user.permissions={audio: false, video: false, edit: false};
-      let loggedInUser=Object.assign({},user);
+      loggedInUser=Object.assign({},user);
       delete user.id;
-      
+      return new Promise(function(resolve, reject){
+        REDIS.hget('isBreakoutActive', discussionId, (err,isActive)=>{
+          if(err || !isActive){
+            resolve(result)
+          }else{
+            socket.emit('isBreakoutActive', true);
+            if(!user.presenter){
+              REDIS.hget('breakouts', discussionId, (err,breakouts)=>{
+                breakouts=JSON.parse(breakouts);
+                if(breakouts[0].indexOf(user.identity) != -1){
+                  discussionId= discussionId+'-0';
+                }else{
+                  discussionId= discussionId+'-1';
+                }
+                resolve(result);
+              })
+            }else{
+              resolve(result);  
+            }
+          }
+        })
+      })
+    }).then((result)=>{
       // Join user to discusison
       socket.join(discussionId)
-      
+  
       // Peer Signaling for video/audio transmission 
       socket.on('message', function (data,peerId) {
           socket.broadcast.to(peerId).emit('message', data,socket.id);
       });
-
+      socket.on('createbreakout', function (breakouts) {
+        REDIS.hset('breakouts', discussionId, JSON.stringify(breakouts) ,_=>{})  
+        REDIS.hset('isBreakoutActive', discussionId, true ,_=>{});
+        socket.to(discussionId).emit('reconnect');
+        socket.emit('reconnect');
+      });
       socket.on('changepermission',function(peerId, action, value){
         REDIS.get('participants', (err, participants) => {
           if (err && CONFIG.DEBUG) console.warn(err)

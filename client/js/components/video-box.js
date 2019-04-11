@@ -68,6 +68,7 @@ module.exports={
         window.stream=stream;
         that.toggleStream()
         if(stream.getVideoTracks().length) that.$refs.videoObj.srcObject = stream
+        that.$refs.videoObj.muted=true
         that.myConnection.addStream(stream)
       },
       checkOnNoShowVideo: function (socketId, opts) {

@@ -52,6 +52,25 @@ module.exports={
           }
           that.paint.redrawLocals();
         });
+        that.socket.on('highlight',function (drawing, tabId, typeOfBoard, pageId) {
+          if (tabId !== that.item.id) return
+          that.paint.effectsCanvas.style.opacity=0.5;
+          if(that.paint.clearHighlightTimer) clearTimeout(that.paint.clearHighlightTimer);
+          if(typeOfBoard === 'content'){
+            let currentPage=that.getCurrentPage();
+            if(currentPage.id === pageId){
+              that.paint.addHighlight(drawing);
+              that.paint.clearHighlightTimer=setTimeout(function(){
+                that.paint.effectsCanvasCtx.clearRect(0, 0, that.paint.effectsCanvas.width, that.paint.effectsCanvas.height);  
+              },5000);
+            }
+          }else{
+            that.paint.addHighlight(drawing)
+            that.paint.clearHighlightTimer=setTimeout(function(){
+              that.paint.effectsCanvasCtx.clearRect(0, 0, that.paint.effectsCanvas.width, that.paint.effectsCanvas.height);  
+            },5000);
+          }
+        });
         that.socket.on('changepage',function (tabId,page) {
           if (tabId !== that.item.id) return
           that.item.currentPage=page
@@ -63,6 +82,7 @@ module.exports={
         });
         that.socket.on('zoom',function (event,tabId) {
           if (!event.zoomFactor || tabId !== that.item.id) return
+          that.paint.setLocalZoom(event.zoom);
           that.paint.zoom(event.zoomFactor, true);  
         });
         that.socket.on('undo',function (tabId, typeOfBoard, pageId) {
@@ -94,6 +114,14 @@ module.exports={
           that.socket.emit('drawing',event.drawing,that.item.id,'content',currentPage.id);  
         }else{
           that.socket.emit('drawing',event.drawing,that.item.id,'whiteboard');
+        }
+      });
+      that.paint.addEventListener("highlight", function (event) {
+        if(that.item.type==='content'){
+          currentPage=that.getCurrentPage();
+          that.socket.emit('highlight',event.drawing,that.item.id,'content',currentPage.id);  
+        }else{
+          that.socket.emit('highlight',event.drawing,that.item.id,'whiteboard');
         }
       });
       that.paint.addEventListener("move", function (event) {

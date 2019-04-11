@@ -6773,7 +6773,24 @@ module.exports=(...args)=>{
 
 			return false;
 		};
-
+		Paint.prototype.addHighlight = function addHighlight (drawing) {
+			let paint=this;
+			paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+			let context=paint.effectsCanvasCtx;
+			for (var i = 1; i < drawing.points.length; i ++){
+		  	context.beginPath();
+				context.fillStyle = drawing.color;
+				context.lineWidth = drawing.size;
+				context.moveTo(drawing.points[i-1][0], drawing.points[i-1][1]);
+				context.lineTo(drawing.points[i][0], drawing.points[i][1]);			
+				context.strokeStyle = drawing.color;
+				context.lineWidth = drawing.size;
+				context.lineJoin = "round";
+				context.lineCap = "round";
+				context.stroke();
+				context.closePath();
+		  }
+		};
 		Paint.prototype.addDrawing = function addDrawing (drawing) {
 			this.localDrawings.push(drawing);
 			drawing.color=tinycolor(drawing.color);
@@ -6933,6 +6950,11 @@ module.exports=(...args)=>{
 			this.exectool("remove");
 			this.current_tool = tool;
 			this.trianglePoints=null;
+
+			this.effectsCanvas.style.opacity=1;
+			if(this.clearHighlightTimer) clearTimeout(this.clearHighlightTimer);
+			if(tool=='highlight') this.effectsCanvas.style.opacity=0.5;
+			
 			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
 
 			for (var name in this.controls.byName)
@@ -7059,6 +7081,15 @@ module.exports=(...args)=>{
 				value: "brush",
 				action: this.changeTool.bind(this)
 			}, {
+				name: "highlight",
+				type: "button",
+				html: "i",
+				place: "left",
+				elemClass: "tool-item tool-highlight fa fa-highlighter fa-2x",
+				title: "Change tool to highlight",
+				value: "highlight",
+				action: this.changeTool.bind(this)
+			}, {
 				name: "text",
 				type: "button",
 				html: "i",
@@ -7166,15 +7197,16 @@ module.exports=(...args)=>{
 				action: this._changeGradient.bind(this)
 			}*/];
 		};
-
+		Paint.prototype.setLocalZoom = function setLocalZoom (zoom){
+			this.local.zoom=zoom;
+		}
 		Paint.prototype.zoom = function zoom (zoomFactor, dontTriggerEvent) {
-			
 			if(!dontTriggerEvent)
 			this.dispatchEvent({
 				type: "zoom",
-				zoomFactor: zoomFactor
+				zoomFactor: zoomFactor,
+				zoom: this.local.zoom
 			});
-
 			this.zoomAbsolute(this.local.zoom * zoomFactor,!dontTriggerEvent);
 		};
 
@@ -7905,7 +7937,9 @@ module.exports=(...args)=>{
 				if (event.type == "mousedown" || event.type == "touchstart") {
 					paint.brushing = true;
 					if(!paint.brushStrokes) paint.brushStrokes=[];
-				
+					if(!paint.localBrushStrokes) paint.localBrushStrokes=[];
+					
+					paint.localBrushStrokes.push(scaledCoords);
 					paint.brushStrokes.push([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 					                        Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
 
@@ -7925,6 +7959,7 @@ module.exports=(...args)=>{
 					}
 					paint.brushing = false;
 					delete paint.brushStrokes;
+					delete paint.localBrushStrokes;
 					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 				}
 
@@ -7961,12 +7996,14 @@ module.exports=(...args)=>{
 					if (paint.brushing) {
 						paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 						var context = paint.effectsCanvasCtx;
+						
+						paint.localBrushStrokes.push(scaledCoords);
 						paint.brushStrokes.push([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 					                            Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
-						for (var i = 1; i < paint.brushStrokes.length; i ++){
+						for (var i = 1; i < paint.localBrushStrokes.length; i ++){
 					  	context.beginPath();
-							context.moveTo(paint.brushStrokes[i-1][0], paint.brushStrokes[i-1][1]);
-							context.lineTo(paint.brushStrokes[i][0], paint.brushStrokes[i][1]);			
+							context.moveTo(paint.localBrushStrokes[i-1][0], paint.localBrushStrokes[i-1][1]);
+							context.lineTo(paint.localBrushStrokes[i][0], paint.localBrushStrokes[i][1]);			
 							context.strokeStyle = paint.current_color.toRgbString();
 							context.lineWidth = paint.current_size;
 							context.lineJoin = "round";
@@ -7974,6 +8011,61 @@ module.exports=(...args)=>{
 							context.stroke();
 							context.closePath();
 					  }
+					}
+				}
+			},
+			highlight: function highlight (paint, event, type) {
+				if (event == "remove") {
+					delete paint.lastMovePoint;
+					delete paint.lockcolor;
+					delete paint.highlighting;
+					return;
+				}
+				if(typeof paint.clearHighlightTimer =='undefined') paint.clearHighlightTimer=null;
+				paint.lastMovePoint = paint.lastMovePoint || [0, 0];
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+				if (event.type == "mousedown" || event.type == "touchstart") {
+					if(paint.clearHighlightTimer){
+						clearTimeout(paint.clearHighlightTimer);
+					}
+					paint.highlighting = true;
+					paint.highlightStrokes=[];
+					paint.highlightStrokes.push(scaledCoords);
+
+					// Clear the previous mouse dot
+					paint.effectsCanvasCtx.clearRect(paint.lastMovePoint[0] - paint.current_size * paint.local.zoom * 2, paint.lastMovePoint[1] - paint.current_size * paint.local.zoom * 2, paint.current_size * paint.local.zoom * 4, paint.current_size * paint.local.zoom * 4);
+				}
+
+				if (event.type == "mouseup" || event.type == "touchend" || event.type == "mouseleave") {
+					if(paint.highlighting){
+						paint.dispatchEvent({
+							type: "highlight",
+							drawing: {
+								points: paint.highlightStrokes,
+								size: paint.current_size,
+								color: paint.current_color.toRgbString()
+							}
+						});
+						delete paint.highlightStrokes;
+						paint.clearHighlightTimer=setTimeout(function(){
+							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);	
+						},5000);
+					}
+					paint.highlighting = false;
+					// delete paint.highlightStrokes;
+					// paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+				}
+
+				if (event.type == "mousemove" || event.type == "touchmove") {
+					
+
+					// If the last brush point is set we are currently drawing
+					if (paint.highlighting) {
+						paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+						paint.highlightStrokes.push(scaledCoords);
+						paint.addHighlight({points: paint.highlightStrokes,color: paint.current_color.toRgbString(), size: paint.current_size});
 					}
 				}
 			},

@@ -31,6 +31,11 @@ var Whiteboard = function () {
         }
       })
     });
+    socket.on('highlight', function (drawing,tabId, typeOfBoard, pageId) {
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('highlight ' + discussionId + ' ' + drawing) }
+      socket.to(discussionId).emit('highlight', drawing, tabId, typeOfBoard, pageId);
+    });
     socket.on('changepage', function (tabId,page) {
       let discussionId = mapSocketToDiscussion[socket.id]
       if (CONFIG.DEBUG) { console.log('changepage ' + tabId + ' on '+ page) }

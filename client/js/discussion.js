@@ -39,6 +39,10 @@ import Toasted from 'vue-toasted';
       discussionId: null,
       presenter: null,
       participants: {},
+      breakouts: [],
+      breakout: {participants: [],groupLeader: null,timeOut: 60},
+      remaining_participants: {},
+      isBreakoutActive: false,
       totalParticipants: 0,
       showNotification: false,
       mediaList: [],
@@ -186,6 +190,20 @@ import Toasted from 'vue-toasted';
           if (peerIdentity) {
             delete that.participants[peerIdentity]
           }
+          that.participants=Object.assign({},that.participants);
+          that.remaining_participants=Object.assign({},that.participants);
+          if(that.breakout.participants.length){
+            that.breakout.participants.forEach(function(identity){
+              if(that.remaining_participants[identity]){
+                delete that.remaining_participants[identity];
+              }
+            })
+            let partIn=that.breakout.participants.indexOf(peerIdentity);
+            if(partIn !== -1){
+              that.breakout.participants.splice(peerIdentity,1);
+            }
+          }
+
           that.totalParticipants = Object.keys(that.participants).length
           if (that.presenter === null) return
           if (data.socketId === that.presenter.peerId) {
@@ -219,10 +237,25 @@ import Toasted from 'vue-toasted';
         that.socket.on('fileaddfailed', function () {
           Vue.toasted.error('File addition failed!', { position: 'bottom-right' }).goAway(1000)
         });
+        that.socket.on('reconnect', function(){
+          that.socket.disconnect();
+          that.contentTabs = [];
+          that.currentTab=null;
+          that.socket.open();
+        })
+        that.socket.on('isBreakoutActive', function(isActive){
+          that.isBreakoutActive=isActive;
+        })
+        that.socket.on('clearworkspace', function(){
+          that.contentTabs = []
+          that.currentTab=null
+        })
         that.socket.on('dumpbuffer', function () {
           that.contentTabs = []
+          that.currentTab=null
           that.socket.emit('dumpbuffer', true);
         });
+
         if (!bufferDumped) {
           setTimeout(function(){
             that.socket.emit('dumpbuffer')
@@ -240,6 +273,11 @@ import Toasted from 'vue-toasted';
         this.isLoadingMedia = true
         this.currentMediaPage = pageNum
         this.socket.emit('loadmedia', pageNum)
+      },
+      clearWorkspace: function(){
+        this.contentTabs=[];
+        this.currentTab=null;
+        this.socket.emit('clearworkspace');
       },
       changeContentPage: function (pageNum) {
         this.isLoadingContent = true
@@ -307,8 +345,40 @@ import Toasted from 'vue-toasted';
                  y + ' z'
         return anim
       },
-      createBreakout: function(){
-
+      createBreakout: function () {
+        let that =this;
+        that.isBreakoutActive=true;
+        that.socket.emit('createbreakout',that.breakouts);
+      },
+      changeRoom: function (identity, room) {
+        let that=this;
+        if(room==0){
+          let userIndex=that.breakout.participants.indexOf(identity);
+          that.breakout.participants.splice(userIndex,1);
+          if(that.breakout.groupLeader == identity){
+            that.breakout.groupLeader=null;
+            if(that.breakout.participants.length) that.breakout.groupLeader=that.breakout.participants[0];
+          }
+          that.remaining_participants[identity]=Object.assign({},that.participants[identity]);
+        }else{
+          if(that.breakout.participants.length < 1){
+            that.breakout.groupLeader=identity;
+            that.breakout.timeOut=60;
+          }
+          that.breakout.participants.push(identity);
+          if(that.remaining_participants[identity]) delete that.remaining_participants[identity];
+        }
+      },
+      manageBreakout: function () {
+        let that=this
+        that.breakout.participants=[];
+        that.remaining_participants=Object.assign({},that.participants);
+        that.breakouts.forEach(function(breakout){
+          breakout.participants.forEach(function(identity){
+            if(that.remaining_participants[identity]) delete that.remaining_participants[identity];
+          });
+        });
+        that.toggleModel('breakout');
       },
       toggleVideo: function () {
         this.isVidAvailable = !this.isVidAvailable

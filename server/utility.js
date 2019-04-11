@@ -84,6 +84,19 @@ var Utility = function () {
         }
       })
     })
+    socket.on('clearworkspace', function(){
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('clearworkspace ' + discussionId) }
+      redis.hget('workplace', discussionId, (err, workplace) => {
+        if (err && CONFIG.DEBUG) console.warn(err)
+        if (workplace) {
+          socket.to(discussionId).emit('clearworkspace')
+          workplace = JSON.parse(workplace)
+          workplace['tabs'] = []
+          redis.hset('workplace', discussionId, JSON.stringify(workplace))
+        }
+      });
+    });
     socket.on('tabadd', function (tabItem) {
       let discussionId = mapSocketToDiscussion[socket.id]
       if (CONFIG.DEBUG) { console.log('tabadd ' + discussionId + ' ' + tabItem) }
