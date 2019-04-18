@@ -7,10 +7,10 @@ var Whiteboard = function () {
       if(typeOfBoard === 'content'){
         if (!workplace['content']) workplace['content'] = {}
         if (!workplace['content'][tabId]) workplace['content'][tabId] = {'currentPage': 1, 'pages': {}}
-        if (pageId && !workplace['content'][tabId]['pages'][pageId]) workplace['content'][tabId]['pages'][pageId] = {'drawings': [],'currentPos': {}, 'zoom': {}}
+        if (pageId && !workplace['content'][tabId]['pages'][pageId]) workplace['content'][tabId]['pages'][pageId] = {'drawings': [],'currentPos': {}, 'zoom': {}, 'grid': {}}
       }else{
         if (!workplace['whiteboard']) workplace['whiteboard'] = {}
-        if (!workplace['whiteboard'][tabId]) workplace['whiteboard'][tabId] = {'drawings': [],'currentPos': {},'zoom': {}}
+        if (!workplace['whiteboard'][tabId]) workplace['whiteboard'][tabId] = {'drawings': [],'currentPos': {},'zoom': {}, 'grid': {}}
       }
       return workplace;
     }
@@ -84,6 +84,24 @@ var Whiteboard = function () {
         }
       })
       socket.to(discussionId).emit('zoom', event, tabId, typeOfBoard, pageId);
+    });
+    socket.on('grid', function (event,tabId, typeOfBoard, pageId) {
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('grid ' + discussionId + ' ' + event) }
+      redis.hget('workplace', discussionId, (err, workplace) => {
+        if (err && CONFIG.DEBUG) console.warn(err)
+        
+        if (workplace) {
+          workplace=initWorkPlace(workplace, tabId, typeOfBoard, pageId);
+          if(typeOfBoard==='content'){
+            workplace[typeOfBoard][tabId]['pages'][pageId]['grid'] = event
+          }else{
+            workplace[typeOfBoard][tabId]['grid'] = event
+          }
+          redis.hset('workplace', discussionId, JSON.stringify(workplace))
+        }
+      })
+      socket.to(discussionId).emit('grid', event, tabId, typeOfBoard, pageId);
     });
     socket.on('undo', function (tabId, typeOfBoard, pageId) {
       let discussionId = mapSocketToDiscussion[socket.id]

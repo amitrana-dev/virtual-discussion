@@ -5986,9 +5986,12 @@ module.exports=(...args)=>{
 			// Set tool values
 			this.changeTool("brush");
 			this.setColor(new tinycolor());
+			this.setStrokeColor(new tinycolor());
 			this.changeToolSize(5, true);
+			this.changeStrokeSize(5, true);
 
 			$(this.controls.byName["tool-color"].input).spectrum("set", this.current_color);
+			$(this.controls.byName["tool-strokecolor"].input).spectrum("set", this.current_stroke_color);
 
 			this.localDrawings = [];
 			this.paths = {};
@@ -6059,6 +6062,7 @@ module.exports=(...args)=>{
 
 			this.redrawPaths();
 			this.drawImage();
+			this.drawGrid();
 			this.redrawLocals();
 			this.redrawFrames();
 		};
@@ -6097,6 +6101,12 @@ module.exports=(...args)=>{
 		};
 
 		Paint.prototype.addCanvas = function addCanvas (container) {
+			// The things that have been drawn and we already know the order of
+			// but have yet to be finalized
+			var gridC = container.appendChild(this.createCanvas("grid"));
+			gridC.oncontextmenu = function() {
+				 return false;  
+			}
 			// The background pngs
 			var backgroundC = container.appendChild(this.createCanvas("background"));
 			backgroundC.oncontextmenu = function() {
@@ -6134,7 +6144,7 @@ module.exports=(...args)=>{
 			this.background = new TiledCanvas(backgroundC);
 			this.public = new TiledCanvas(publicC);
 			this.local = new TiledCanvas(localC);
-
+			this.gridC = gridC;
 			this.public.requestUserChunk = function requestPublicUserChunk (cx, cy, callback) {
 				// We actually dont have background chunks, but we have to make sure
 				// the background canvas requests background images when we get
@@ -6162,6 +6172,9 @@ module.exports=(...args)=>{
 
 			this.effectsCanvas = effectC;
 			this.effectsCanvasCtx = effectC.getContext("2d");
+
+			this.gridCCtx = gridC.getContext("2d");
+			this.gridC.context=this.gridCCtx; 
 
 			effectC.addEventListener("mousedown", this.exectool.bind(this));
 			effectC.addEventListener("mousemove", this.exectool.bind(this));
@@ -6502,6 +6515,24 @@ module.exports=(...args)=>{
 			this.backgroundImage=image;
 			this.drawDrawing("background", {type: 'bgImage',image: image});
 		};
+
+		Paint.prototype.showGrid = function showGrid (show,dontTriggerEvent) {
+			if(!dontTriggerEvent)
+			this.dispatchEvent({
+				type: "grid",
+				show: !this.gridVisible
+			});
+			if(typeof show == 'string'){
+				this.gridVisible=!this.gridVisible;
+			}else{
+				this.gridVisible=show;
+			}
+			this.drawDrawing("gridC", {type: 'grid',showGrid: this.gridVisible});
+		};
+
+		Paint.prototype.drawGrid = function drawGrid (){
+			this.drawDrawing.bind({type: 'grid',showGrid: this.gridVisible}, "gridC")
+		};
 		Paint.prototype.drawImage = function drawImage (){
 			if(!this.backgroundImage) return;
 			// Force the redrawing of locals in this frame
@@ -6794,6 +6825,7 @@ module.exports=(...args)=>{
 		Paint.prototype.addDrawing = function addDrawing (drawing) {
 			this.localDrawings.push(drawing);
 			drawing.color=tinycolor(drawing.color);
+			drawing.stroke_color=tinycolor(drawing.stroke_color);
 			this.drawDrawing("local", drawing);
 		};
 		// Function that should be called when a new drawing is added
@@ -6801,6 +6833,7 @@ module.exports=(...args)=>{
 		Paint.prototype.addUserDrawing = function addUserDrawing (drawing) {
 			let tempDrawing=Object.assign({},drawing);
 			tempDrawing.color=drawing.color.toRgbString();
+			if(drawing.stroke_color) tempDrawing.stroke_color=drawing.stroke_color.toRgbString();
 			this.addDrawing(drawing);
 			this.dispatchEvent({
 				type: "userdrawing",
@@ -6886,18 +6919,18 @@ module.exports=(...args)=>{
 				else if (drawings[dKey].points)
 					this.drawFunctions.path.call(this, this[layer].context, drawings[dKey], this[layer]);
 				else
-					console.error("Unkown drawing", drawings[dKey]);
+					console.error("Unknown drawing", drawings[dKey]);
 
 			}
 			
 			this[layer].redrawOnce();
 		};
 
-		// Put the drawing on the given layer ('background', 'public', 'local', 'effects')
+		// Put the drawing on the given layer ('background', 'public', 'local', 'effects','gridC')
 		// This function only redraws at the next browser drawframe
 		Paint.prototype.drawDrawing = function drawDrawing (layer, drawing) {
 			this.drawFunctions[drawing.type].call(this, this[layer].context, drawing, this[layer]);
-			this[layer].redrawOnce();
+			if(typeof this[layer].redrawOnce =='function') this[layer].redrawOnce();
 		};
 
 		// User interaction on the canvas
@@ -6964,6 +6997,12 @@ module.exports=(...args)=>{
 			this.exectool("setup");
 		};
 
+		Paint.prototype._changeStrokeColor = function _changeStrokeColor (color) {
+			this.current_stroke_color = tinycolor(color);
+			this.currentColorMode = "color";
+			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
+		};
+
 		Paint.prototype._changeColor = function _changeColor (color) {
 			this.current_color = tinycolor(color);
 			this.currentColorMode = "color";
@@ -7000,11 +7039,40 @@ module.exports=(...args)=>{
 				context.fill();
 			}
 		};
+		Paint.prototype.changeStrokeSize = function changeStrokeSize (size, setinput) {
+			if (this.brushing) return;
+
+			if (size > this.settings.maxSize) size = this.settings.maxSize;
+			if (size <= 1) size = this.MIN_PATH_WIDTH;
+			if (size == 2.001) size = 2;
+
+			this.current_stroke_size = parseFloat(size);
+			
+			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
+
+			if (setinput) {
+				this.controls.byName["tool-strokesize"].input.value = size;
+				// this.controls.byName["tool-size"].integerOutput.textContent = (size==this.MIN_PATH_WIDTH) ? '1' : size; // display 1 instead of min path size fraction
+			}
+			if (this.lastMovePoint) {
+				var context = this.effectsCanvasCtx;
+				context.beginPath();
+				context.arc(this.lastMovePoint[0], this.lastMovePoint[1], (this.current_stroke_size * this.local.zoom) / 2, 0, 2 * Math.PI, true);
+				context.fillStyle = this.current_stroke_color.toRgbString();
+				context.fill();
+			}
+		};
 
 		Paint.prototype.setColor = function setColor (color) {
 			if (this.brushing) return;
 			this._changeColor(color);
 			$(this.controls.byName["tool-color"].input).spectrum("set", this.current_color);
+		};
+		
+		Paint.prototype.setStrokeColor = function setStrokeColor (color) {
+			if (this.brushing) return;
+			this._changeStrokeColor(color);
+			$(this.controls.byName["tool-strokecolor"].input).spectrum("set", this.current_stroke_color);
 		};
 
 		Paint.prototype.createControlArray = function createControlArray () {
@@ -7167,7 +7235,19 @@ module.exports=(...args)=>{
 				title: "Reset zoom",
 				value: 1 / 1.2,
 				action: this.zoom.bind(this)
-			},/* {
+			},{
+				name: "tool-strokesize",
+				place: "top",
+				type: "integer",
+				range: true,
+				text: "Tool stroke size",
+				min: 1,
+				max: this.defaultSettings.maxSize,
+				value: 5,
+				title: "Change the stroke size of the tool",
+				action: this.changeStrokeSize.bind(this)
+			},
+			/* {
 				name: "zoom-in",
 				type: "button",
 				html: "i",
@@ -7191,6 +7271,23 @@ module.exports=(...args)=>{
 				place: "left",
 				title: "Change the color of the tool",
 				action: this._changeColor.bind(this)
+			}, {
+				name: "tool-strokecolor",
+				type: "color",
+				text: "Tool stroke color",
+				value: "#FFFFFF",
+				place: "left",
+				title: "Change the stroke color of the tool",
+				action: this._changeStrokeColor.bind(this)
+			}, {
+				name: "tool-grid",
+				type: "button",
+				html: "i",
+				elemClass: "fas fa-th",
+				value: "true",
+				place: "top",
+				title: "Toggle Grid",
+				action: this.showGrid.bind(this)
 			}/*, {
 				name: "gradient",
 				type: "gradient",
@@ -7581,7 +7678,9 @@ module.exports=(...args)=>{
 						x1: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 						y1: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 						size: paint.current_size,
-						color: paint.current_color
+						color: paint.current_color,
+						stroke_size: paint.current_stroke_size,
+						stroke_color: paint.current_stroke_color
 					});
 
 					delete paint.lastLinePoint;
@@ -7662,7 +7761,9 @@ module.exports=(...args)=>{
 								x2: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								y2: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								size: paint.current_size,
-								color: paint.current_color
+								color: paint.current_color,
+								stroke_size: paint.current_stroke_size,
+								stroke_color: paint.current_stroke_color
 							});
 							delete paint.trianglePoints;
 							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
@@ -7681,27 +7782,30 @@ module.exports=(...args)=>{
 					if(paint.trianglePoints.length ==1){
 						context.beginPath();
 						context.arc(paint.trianglePoints[0][0], paint.trianglePoints[0][1], 2, 0, 2 * Math.PI, true);
-						context.fillStyle = paint.current_color.toRgbString();
+						context.fillStyle = paint.current_stroke_color.toRgbString();
 						context.fill();
 						
 						context.beginPath();
 						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
 						context.lineTo(scaledCoords[0], scaledCoords[1]);			
-						context.strokeStyle = paint.current_color.toRgbString();
+						context.strokeStyle = paint.current_stroke_color.toRgbString();
 						context.lineWidth = 2 ;
 						context.stroke();
 
 						context.beginPath();
 						context.arc(scaledCoords[0], scaledCoords[1], 2, 0, 2 * Math.PI, true);
-						context.fillStyle = paint.current_color.toRgbString();
+						context.fillStyle = paint.current_stroke_color.toRgbString();
 						context.fill();
 					}else{
 						context.beginPath();
 						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
 						context.lineTo(paint.trianglePoints[1][0], paint.trianglePoints[1][1]);			
 						context.lineTo(scaledCoords[0], scaledCoords[1]);			
-						context.strokeStyle = paint.current_color.toRgbString();
-						context.lineWidth = 2 ;
+						context.strokeStyle = paint.current_stroke_color.toRgbString();
+						context.fillStyle = paint.current_color.toRgbString();
+						context.lineWidth = paint.current_stroke_size ;
+						context.closePath();
+						context.stroke();
 						context.fill();
 					}
 						
@@ -7741,7 +7845,9 @@ module.exports=(...args)=>{
 								type: "ellipse",
 								points: paint.trianglePoints,
 								size: paint.current_size,
-								color: paint.current_color
+								color: paint.current_color,
+								stroke_size: paint.current_stroke_size,
+								stroke_color: paint.current_stroke_color
 							});
 							delete paint.trianglePoints;
 							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
@@ -7804,7 +7910,9 @@ module.exports=(...args)=>{
 								x2: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								y2: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								size: paint.current_size,
-								color: paint.current_color
+								color: paint.current_color,
+								stroke_size: paint.current_stroke_size,
+								stroke_color: paint.current_stroke_color
 							});
 							delete paint.trianglePoints;
 							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
@@ -7823,19 +7931,19 @@ module.exports=(...args)=>{
 					if(paint.trianglePoints.length ==1){
 						context.beginPath();
 						context.arc(paint.trianglePoints[0][0], paint.trianglePoints[0][1], 2, 0, 2 * Math.PI, true);
-						context.fillStyle = paint.current_color.toRgbString();
+						context.fillStyle = paint.current_stroke_color.toRgbString();
 						context.fill();
 						
 						context.beginPath();
 						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
 						context.lineTo(scaledCoords[0], scaledCoords[1]);			
-						context.strokeStyle = paint.current_color.toRgbString();
-						context.lineWidth = 2 ;
+						context.lineWidth=paint.current_stroke_size;
+						context.strokeStyle=paint.current_stroke_color.toRgbString();
 						context.stroke();
 
 						context.beginPath();
 						context.arc(scaledCoords[0], scaledCoords[1], 2, 0, 2 * Math.PI, true);
-						context.fillStyle = paint.current_color.toRgbString();
+						context.fillStyle = paint.current_stroke_color.toRgbString();
 						context.fill();
 					}else{
 						var diffX=scaledCoords[0] - paint.trianglePoints[1][0];
@@ -7846,8 +7954,11 @@ module.exports=(...args)=>{
 						context.lineTo(paint.trianglePoints[1][0], paint.trianglePoints[1][1]);			
 						context.lineTo(scaledCoords[0], scaledCoords[1]);			
 						context.lineTo(diffX + paint.trianglePoints[0][0], diffY + paint.trianglePoints[0][1]);
-						context.strokeStyle = paint.current_color.toRgbString();
-						context.lineWidth = 2 ;
+						context.lineWidth=paint.current_stroke_size;
+						context.strokeStyle=paint.current_stroke_color.toRgbString();
+						context.fillStyle = paint.current_color.toRgbString();
+						context.closePath();
+						context.stroke();
 						context.fill();
 					}
 						
@@ -7885,7 +7996,9 @@ module.exports=(...args)=>{
 						x1: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 						y1: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 						size: paint.current_size,
-						color: paint.current_color
+						color: paint.current_color,
+						stroke_size: paint.current_stroke_size,
+						stroke_color: paint.current_stroke_color
 					});
 
 					delete paint.lastLinePoint;
@@ -7901,6 +8014,9 @@ module.exports=(...args)=>{
 						context.beginPath();
 						context.arc(scaledCoords[0], scaledCoords[1], circleRadius, 0, 2 * Math.PI, true);
 						context.fillStyle = paint.current_color.toRgbString();
+						context.lineWidth=paint.current_stroke_size * paint.local.zoom;
+						context.strokeStyle=paint.current_stroke_color.toRgbString();
+						context.stroke();
 						context.fill();	
 					}else{
 						context.beginPath();
@@ -7915,7 +8031,9 @@ module.exports=(...args)=>{
 						} else {
 							context.fillStyle = paint.current_color.toRgbString();
 						}
-
+						context.lineWidth=paint.current_stroke_size * paint.local.zoom;
+						context.strokeStyle=paint.current_stroke_color.toRgbString();
+						context.stroke();
 						context.fill();
 						// Save the last move point for efficient clearing
 						paint.lastMovePoint= scaledCoords;
@@ -7954,7 +8072,9 @@ module.exports=(...args)=>{
 							type: "brush",
 							points: paint.brushStrokes,
 							size: paint.current_size,
-							color: paint.current_color
+							color: paint.current_color,
+							stroke_size: paint.current_stroke_size,
+							stroke_color: paint.current_stroke_color
 						});
 					}
 					paint.brushing = false;
@@ -8206,7 +8326,9 @@ module.exports=(...args)=>{
 						x: Math.round(paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)),
 						y: Math.round(paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)),
 						size: paint.current_size,
-						color: paint.current_color
+						color: paint.current_color,
+						stroke_size: paint.current_stroke_size,
+						stroke_color: paint.current_stroke_color
 					});
 					paint.textToolInput.value = "";
 				}
@@ -8488,9 +8610,11 @@ module.exports=(...args)=>{
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x2, drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE);
+				context.strokeStyle = drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
-				context.lineWidth = 2;
-				
+				context.lineWidth = drawing.stroke_size;
+				context.closePath();
+				context.stroke();
 				context.fill();
 				
 				if (tiledCanvas) {
@@ -8499,7 +8623,7 @@ module.exports=(...args)=>{
 					var bottomRightX=Math.max(drawing.x,drawing.x1,drawing.x2);
 					var bottomRightY=Math.max(drawing.y,drawing.y1,drawing.y2);
 					
-					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
+					tiledCanvas.drawingRegion(topLeftX - drawing.stroke_size , topLeftY -drawing.stroke_size, bottomRightX + drawing.stroke_size, bottomRightY + drawing.stroke_size, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
 			},
@@ -8511,9 +8635,12 @@ module.exports=(...args)=>{
 				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x2, drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(diffX + drawing.x, diffY + drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineWidth=drawing.stroke_size;
+				context.strokeStyle=drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
-				context.lineWidth = 2;
-				
+				context.closePath();
+				context.stroke();
 				context.fill();
 				
 				if (tiledCanvas) {
@@ -8522,7 +8649,7 @@ module.exports=(...args)=>{
 					var bottomRightX=Math.max(drawing.x,drawing.x1,drawing.x2,diffX);
 					var bottomRightY=Math.max(drawing.y,drawing.y1,drawing.y2,diffY);
 					
-					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
+					tiledCanvas.drawingRegion(topLeftX - drawing.stroke_size, topLeftY - drawing.stroke_size, bottomRightX + drawing.stroke_size, bottomRightY + drawing.stroke_size, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
 			},
@@ -8559,14 +8686,58 @@ module.exports=(...args)=>{
 				context.beginPath();
 				context.arc(drawing.x1, drawing.y1, circleRadius, 0, 2 * Math.PI, true);
 				context.fillStyle = drawing.color.toRgbString();
+				context.lineWidth=drawing.stroke_size;
+				context.strokeStyle=drawing.stroke_color.toRgbString();
+				context.stroke();
 				context.fill();
 				if (tiledCanvas) {
-					let topLeftX=drawing.x1-circleRadius;
-					let topLeftY=drawing.y1-circleRadius;
-					let bottomRightX=drawing.x1+circleRadius;
-					let bottomRightY=drawing.y1+circleRadius;
+					let topLeftX=drawing.x1 - circleRadius - drawing.stroke_size;
+					let topLeftY=drawing.y1-circleRadius - drawing.stroke_size;
+					let bottomRightX=drawing.x1+circleRadius + drawing.stroke_size;
+					let bottomRightY=drawing.y1+circleRadius + drawing.stroke_size;
 					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
 					tiledCanvas.executeNoRedraw();
+				}
+			},
+			grid: function (context, drawing, canvas){
+				// credits: https://codepen.io/airen/pen/wJMGwW?editors=1010
+				function drawScreen (context) {
+			    var dx = 50;
+			    var dy = 50;
+			    var x = 0;
+			    var y = 0;
+			    var w = canvas.width;
+			    var h = canvas.height;
+			    
+			    var xy = 10;
+			    context.beginPath();
+			    context.lineWidth = 0.5;
+			    
+			    while (y < h) {
+			      y = y + dy;
+			      context.moveTo(x, y);
+			      context.lineTo(w, y);
+			      context.stroke();
+			      
+			      xy += 10;  
+			    }
+			    
+			    y = 0;  
+			    xy =10; 
+			    while (x < w) {
+			      x = x + dx;
+			      context.moveTo(x, y);  
+			      context.lineTo(x,h);  
+			      context.stroke();   
+			      xy+=10;  
+			    }
+			  }
+			  console.log(drawing,context);
+			  context.clearRect(0, 0, canvas.width, canvas.height);
+			  if(drawing.showGrid){
+					drawScreen(context);
+				}else{
+					//context.clearRect(0, 0, canvas.width, canvas.height);
 				}
 			},
 			bgImage: function (context, drawing, tiledCanvas){

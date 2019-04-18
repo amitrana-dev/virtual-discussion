@@ -27,15 +27,28 @@
           <a v-if="loggedInUser && (loggedInUser.presenter || loggedInUser.permissions.audio)" class="p-2 fa" href="javascript:void(0)" title="Toggle Audio" id="toggleAudio" @click="toggleAudio"  :class="{'text-danger': isAudioAvailable,'text-dark': !isAudioAvailable}"><i class="fa" :class="{'fa-microphone': isAudioAvailable,'fa-microphone-slash': !isAudioAvailable}"></i></a>
         </nav>
         <nav class="my-2 my-md-0 mr-md-3">
-          <a class="p-2 text-dark fa" title="Time Record" href="javascript:void(0)">
-            <svg class="nav-time-record" width="25" height="25" viewbox="0 0 250 250">
-              <circle cx="125" cy="125" r="120" stroke="black" stroke-width="2" fill="none" />
-              <path :d="drawRemainingTime()" stroke="black" transform="translate(125, 125) scale(.84)"/>
-            </svg>
-          </a>
+          <div class="dropdowns-wrapper">
+            <div class="dropdown-container timer-container">
+              <div class="notifications dropdown dd-trigger" title="Time Record" @click="showTimer=!showTimer">
+                <svg class="nav-time-record" width="25" height="25" viewbox="0 0 250 250">
+                  <circle cx="125" cy="125" r="120" stroke="black" stroke-width="2" fill="none" />
+                  <path :d="drawRemainingTime()" stroke="black" transform="translate(125, 125) scale(.84)"/>
+                </svg>
+              </div>
+              <div class="dropdown-menu animated p-0" :class="{'fadeOutUp': !showTimer,'fadeInDown': showTimer,'d-block': showTimer}">
+                <div class="dropdown-header">
+                  <span class="triangle"></span>
+                  <span class="heading">Remaining Time</span>
+                </div>
+                <div class="dropdown-body text-center font-weight-bold fa-3x">
+                  <span class="remaining-hours">{{remainingDuration.hours < 10 ? '0'+remainingDuration.hours : remainingDuration.hours}}</span>:<span class="remaining-mins">{{remainingDuration.minutes < 10 ? '0'+remainingDuration.minutes : remainingDuration.minutes}}</span>:<span class="remaining-secs">{{remainingDuration.seconds < 10 ? '0'+remainingDuration.seconds : remainingDuration.seconds}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
           <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 text-dark fa" href="javascript:void(0)" @click="manageBreakout()" title="Manage Breakout Room"><i class="fa fa-columns"></i></a>
           <div class="dropdowns-wrapper">
-            <div class="dropdown-container">
+            <div class="dropdown-container notification-container">
               <div class="notifications dropdown dd-trigger" @click="showNotification=!showNotification">
                 <span class="count animated" id="notifications-count">{{totalParticipants}}</span>
                 <span class="fa fa-users"></span>
@@ -43,7 +56,7 @@
               <div class="dropdown-menu animated p-0" :class="{'fadeOutUp': !showNotification,'fadeInDown': showNotification,'d-block': showNotification}">
                 <div class="dropdown-header">
                   <span class="triangle"></span>
-                  <span class="heading">Paticipants</span>
+                  <span class="heading">Participants</span>
                   <span class="count" id="dd-notifications-count">{{totalParticipants}}</span>
                 </div>
                 <div class="dropdown-body">
@@ -70,6 +83,7 @@
           <!--a class="p-2 text-dark fa" href="javascript:void(0)" title="Notifications"><i class="fa fa-bell"></i></a-->
           <a class="ml-md-5 text-dark fa" href="javascript:void(0)" title="Clear Workspace" @click="clearWorkspace()"><i class="fa fa-sync"></i></a>
           <a class="ml-md-3 text-dark fa" href="javascript:void(0)" title="Toggle Fullscreen" @click="toggleFullscreen('discussion_board')"><i class="fa fa-expand"></i></a>
+          <a href="javascript:void(0)"  v-if="loggedInUser && loggedInUser.presenter" title="End Session" class="ml-md-3 text-dark fa" @click="endSession()"><i class="fas fa-sign-out-alt"></i></a>
         </nav>
       </div>
       <div class="d-flex flex-column flex-md-row p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm playground">

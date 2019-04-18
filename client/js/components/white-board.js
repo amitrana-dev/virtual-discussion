@@ -85,6 +85,11 @@ module.exports={
           that.paint.setLocalZoom(event.zoom);
           that.paint.zoom(event.zoomFactor, true);  
         });
+        that.socket.on('grid',function (event,tabId) {
+          if (tabId !== that.item.id) return
+          console.log(event.show);
+          that.paint.showGrid(event.show, true);  
+        });
         that.socket.on('undo',function (tabId, typeOfBoard, pageId) {
           if (tabId !== that.item.id) return
           if(typeOfBoard === 'content'){
@@ -140,6 +145,15 @@ module.exports={
           that.socket.emit('zoom',event,that.item.id,'content',currentPage.id);  
         }else{
           that.socket.emit('zoom',event,that.item.id, 'whiteboard');
+        }
+      });
+      that.paint.addEventListener("grid", function (event) {
+        delete event.target;
+        if(that.item.type==='content'){
+          currentPage=that.getCurrentPage();
+          that.socket.emit('grid',event,that.item.id,'content',currentPage.id);  
+        }else{
+          that.socket.emit('grid',event,that.item.id, 'whiteboard');
         }
       });
       that.paint.addEventListener("undo", function (event) {

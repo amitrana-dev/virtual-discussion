@@ -44,6 +44,7 @@ var Utility = function () {
             });
             socket.emit('move', workplace['whiteboard'][tabId]['currentPos'], tabId);
             socket.emit('zoom', workplace['whiteboard'][tabId]['zoom'], tabId);
+            socket.emit('grid', workplace['whiteboard'][tabId]['grid'], tabId);
           }
         })
         // dump content drawings
@@ -57,6 +58,7 @@ var Utility = function () {
                 socket.emit('changepage', tabId, workplace['content'][tabId]['currentPage']);
                 socket.emit('move', workplace['content'][tabId]['pages'][pageId]['currentPos'], tabId);
                 socket.emit('zoom', workplace['content'][tabId]['pages'][pageId]['zoom'], tabId);
+                socket.emit('grid', workplace['content'][tabId]['pages'][pageId]['grid'], tabId);
               }
             });
           }
@@ -84,6 +86,19 @@ var Utility = function () {
         }
       })
     })
+    socket.on('endsession', function(){
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('endsession ' + discussionId) }
+      redis.hget('workplace', discussionId, (err, workplace) => {
+        if (err && CONFIG.DEBUG) console.warn(err)
+        if (workplace) {
+          socket.to(discussionId).emit('endsession')
+          workplace = JSON.parse(workplace)
+          workplace['closed']=true;
+          redis.hset('workplace', discussionId, JSON.stringify(workplace))
+        }
+      });
+    });
     socket.on('clearworkspace', function(){
       let discussionId = mapSocketToDiscussion[socket.id]
       if (CONFIG.DEBUG) { console.log('clearworkspace ' + discussionId) }

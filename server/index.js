@@ -40,7 +40,7 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
     let loggedInUser=null
     if (CONFIG.DEBUG) { console.log(userToken + ' connected on socket ' + socket.id) }
     
-    Promise.all([DISCUSSION.getInfo(discussionId),USER.getUserInfoForDiscussion(userToken,discussionId)])
+    Promise.all([DISCUSSION.getInfo(discussionId,REDIS),USER.getUserInfoForDiscussion(userToken,discussionId)])
     .then((result) => {
       [discussionInfo,user]=result
       user.peerId=socket.id;
@@ -124,7 +124,7 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
       return new Promise((resolve, reject) => {
         REDIS.hget('workplace', discussionId, (err, workplace) => {
           if (err || workplace==null) {
-            workplace={tabs: [],settings:{},participants: []}
+            workplace={tabs: [],settings:{},participants: [], closed: false}
             REDIS.hset('workplace', discussionId, JSON.stringify(workplace),function(){
               resolve()
             })

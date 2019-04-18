@@ -10,14 +10,25 @@ const CONN = MYSQL.createConnection({
   database : CONFIG.MYSQL_DB
 });
 var Discussion = function () {
-  function getInfo (discussionId) {
+  function getInfo (discussionId, redis) {
     if( CONFIG.DEBUG ) { console.info( 'Checking discussion by id: ' + discussionId ) ; }
     return new Promise((resolve,reject)=>{
         /*
           Test Code for now
         */
         if(discussionId > 20 ) reject(new Error('Ooops!!! Wrong discussion maybe?'))
-        resolve({id: discussionId,title: 'Learning-101 ' + Math.random().toString(36).substring(4),startTime: new Date(),duration: 60});
+        redis.hget('workplace', discussionId, (err, workplace) => {
+          if (err && CONFIG.DEBUG) console.warn(err)
+          if (workplace) {
+            workplace = JSON.parse(workplace)
+            if(workplace['closed']){
+              reject(new Error('This discussion is closed'));
+              return;
+            }
+          }
+          resolve({id: discussionId,title: 'Learning-101 ' + Math.random().toString(36).substring(4),startTime: new Date(),duration: 20});  
+        })
+
       // CONN.query('SELECT C.id,C.title FROM courses as C WHERE C.id=? LIMIT 1',[discussionId], function (error, results, fields) {
       //  if(error) reject(error)
       //  resolve(results[0]);

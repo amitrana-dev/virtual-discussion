@@ -23,6 +23,7 @@ import Toasted from 'vue-toasted';
     el: '#discussion_board',
     data: {
       course: {},
+      remainingDuration: {hours: 0,minutes: 0,seconds: 0},
       isVidAvailable: false,
       isAudioAvailable: false,
       isRecordingAvailable: false,
@@ -45,6 +46,7 @@ import Toasted from 'vue-toasted';
       isBreakoutActive: false,
       totalParticipants: 0,
       showNotification: false,
+      showTimer: false,
       mediaList: [],
       isLoadingMedia: false,
       totalMediaPages: 0,
@@ -106,6 +108,13 @@ import Toasted from 'vue-toasted';
         that.socket = io
         that.socket.on('discussiondetail', function (course) {
           that.course = course
+          let intervalTimer=setInterval(_=>{
+           let secondRemain=that.calculateRemainingTime();
+           if(secondRemain <= 0){
+            clearInterval(intervalTimer);
+            that.endSession();
+           } 
+          },1000)
         })
         that.socket.on('validuser', function (user) {
           that.loggedInUser = user
@@ -115,7 +124,7 @@ import Toasted from 'vue-toasted';
           Vue.toasted.error(msg, { position: 'bottom-right' }).goAway(2000)
           setTimeout(() => {
             Vue.toasted.error('Redirecting to home..', { position: 'bottom-right' })
-            // setTimeout(()=>{window.location='/'},1000)
+            setTimeout(()=>{window.location='/'},1000)
           }, 3000)
         })
         that.socket.on('tabadd', function (tabItem) {
@@ -246,6 +255,9 @@ import Toasted from 'vue-toasted';
         that.socket.on('isBreakoutActive', function(isActive){
           that.isBreakoutActive=isActive;
         })
+        that.socket.on('endsession', function(){
+          that.endSession();
+        });
         that.socket.on('clearworkspace', function(){
           that.contentTabs = []
           that.currentTab=null
@@ -312,12 +324,34 @@ import Toasted from 'vue-toasted';
         that.socket.emit('editorchange_language', lang, tabId)
       },
       handleClick: function (ev) {
-        if (!document.querySelector('.dropdown-container').contains(ev.target)) {
+        if (!document.querySelector('.timer-container').contains(ev.target)) {
+          this.showTimer=false
+        }
+        if (!document.querySelector('.notification-container').contains(ev.target)) {
           this.showNotification = false
         }
         if (!document.querySelector('#play-menu .dropdown').contains(ev.target)) {
           this.toggleMenu(true)
         }
+      },
+      endSession: function(){
+        this.isLoading=true;
+        Vue.toasted.info('Discussion has been ended. You will be redirected to home page soon...', { position: 'bottom-right' })
+        setTimeout(()=>{window.location='/'},3000)
+        this.socket.emit('endsession');
+      },
+      calculateRemainingTime: function(){
+        let moment=require('moment')
+        let currentTime=moment();
+        let courseStartTime=moment(this.course.startTime);
+        if(currentTime >= courseStartTime){
+          let duration=moment.duration(courseStartTime.add(this.course.duration,'minutes').diff(currentTime));
+          this.remainingDuration.hours=duration.hours();
+          this.remainingDuration.minutes=duration.minutes();
+          this.remainingDuration.seconds=duration.seconds();
+          return duration.asSeconds();
+        }
+        return 0;
       },
       drawRemainingTime: function () {
         let moment=require('moment')
