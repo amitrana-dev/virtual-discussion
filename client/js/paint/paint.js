@@ -5996,6 +5996,7 @@ module.exports=(...args)=>{
 			this.localDrawings = [];
 			this.paths = {};
 			this.localUserPaths = [];
+			this.localEraserPaths = [];
 
 			// Drawings that have not yet finalized
 			// The server still has to write them to image
@@ -6531,7 +6532,7 @@ module.exports=(...args)=>{
 		};
 
 		Paint.prototype.drawGrid = function drawGrid (){
-			this.drawDrawing.bind({type: 'grid',showGrid: this.gridVisible}, "gridC")
+			this.drawDrawing("gridC", {type: 'grid',showGrid: this.gridVisible});
 		};
 		Paint.prototype.drawImage = function drawImage (){
 			if(!this.backgroundImage) return;
@@ -6573,6 +6574,86 @@ module.exports=(...args)=>{
 			tiledCanvas.drawingRegion(minX, minY, maxX, maxY, path.size);
 			tiledCanvas.execute();
 		};
+		Paint.prototype.erasePathTiledCanvas = function erasePathTiledCanvas (path, ctx, tiledCanvas) {
+			var minX = path.points[0][0],
+			    minY = path.points[0][1],
+			    maxX = path.points[0][0],
+			    maxY = path.points[0][1];
+
+			ctx.save();
+			// Start on the first point
+			ctx.beginPath();
+			ctx.globalCompositeOperation="destination-out";
+			ctx.moveTo(path.points[0][0], path.points[0][1] + this.FIX_CANVAS_PIXEL_SIZE); // Might not be necessary
+
+			// Connect a line between all points
+			for (var pointId = 1; pointId < path.points.length; pointId++) {
+				ctx.lineTo(path.points[pointId][0], path.points[pointId][1] + this.FIX_CANVAS_PIXEL_SIZE); // Might not be necessary
+
+				minX = Math.min(path.points[pointId][0], minX);
+				minY = Math.min(path.points[pointId][1], minY);
+				maxX = Math.max(path.points[pointId][0], maxX);
+				maxY = Math.max(path.points[pointId][1], maxY);
+			}
+
+			ctx.lineWidth = path.size; // Might not be necessary
+
+			ctx.lineCap = "round";
+
+			ctx.stroke();
+			ctx.closePath();
+			ctx.restore();
+			
+			tiledCanvas.drawingRegion(minX, minY, maxX, maxY, path.size);
+			tiledCanvas.execute();
+			
+			if (tiledCanvas == this.public || tiledCanvas == this.background)
+				this.redrawFrames();
+		};
+
+		Paint.prototype.erasePath = function erasePath (path, ctx, tiledCanvas) {
+			var ctx = ctx || this.pathContext;
+			if (!path.points || !path.points[0]) return;
+
+			if (tiledCanvas) {
+				this.erasePathTiledCanvas(path, ctx, tiledCanvas);
+				return;
+			}
+
+			ctx.save();
+			// Start on the first point
+			ctx.beginPath();
+			ctx.globalCompositeOperation="destination-out";
+			var x = path.points[0][0] - this.public.leftTopX,
+			    y = path.points[0][1] - this.public.leftTopY;
+			ctx.moveTo(x * this.local.zoom, y * this.local.zoom + this.FIX_CANVAS_PIXEL_SIZE);
+
+			var minX = Infinity;
+			var minY = Infinity;
+			var maxX = -Infinity;
+			var maxY = -Infinity;
+
+			// Connect a line between all points
+			for (var pointId = 1; pointId < path.points.length; pointId++) {
+				var x = path.points[pointId][0] - this.public.leftTopX,
+				    y = path.points[pointId][1] - this.public.leftTopY;
+				ctx.lineTo(x * this.local.zoom, y * this.local.zoom + this.FIX_CANVAS_PIXEL_SIZE);
+				if (x < minX) minX = x;
+				if (x > maxX) maxX = x;
+			}
+
+			ctx.lineWidth = path.size * this.local.zoom;
+
+			ctx.lineJoin = "round";
+			ctx.lineCap = "round";
+
+			ctx.stroke();
+			ctx.closePath();
+			ctx.restore();
+			ctx.lineJoin = "miter";
+			ctx.lineCap = "butt";
+		};
+
 		Paint.prototype.drawPathTiledCanvas = function drawPathTiledCanvas (path, ctx, tiledCanvas) {
 			var minX = path.points[0][0],
 			    minY = path.points[0][1],
@@ -6808,6 +6889,7 @@ module.exports=(...args)=>{
 			let paint=this;
 			paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 			let context=paint.effectsCanvasCtx;
+			context.globalCompositeOperation="source-over";
 			for (var i = 1; i < drawing.points.length; i ++){
 		  	context.beginPath();
 				context.fillStyle = drawing.color;
@@ -6842,6 +6924,45 @@ module.exports=(...args)=>{
 			});
 		};
 
+		// Functions for the current eraser path (eraser path = path we are drawing)
+		Paint.prototype.addEraserPath = function addEraserPath (color) {
+			this.localEraserPaths.push({
+				type: "eraser",
+				color: color ||this.current_color,
+				size: this.current_size
+			});
+			//this.drawPath(this.localUserPaths[this.localUserPaths.length -1]);
+			this.dispatchEvent({
+				type: "starteraserpath",
+				props: this.localEraserPaths[this.localEraserPaths.length - 1]
+			});
+		};
+
+		Paint.prototype.addEraserPathPoint = function addEraserPathPoint (point) {
+			var lastPath = this.localEraserPaths[this.localEraserPaths.length - 1];
+			lastPath.points = lastPath.points || [];
+			lastPath.points.push(point);
+
+			this.dispatchEvent({
+				type: "eraserpathpoint",
+				point: point
+			});
+			this.erasePath(lastPath,this.effectsCanvasCtx);
+		};
+
+		Paint.prototype.endEraserPath = function endEraserPath (final) {
+			var lastPath = this.localEraserPaths[this.localEraserPaths.length - 1];
+			
+			if (typeof lastPath === 'undefined')
+				return;
+			
+			this.dispatchEvent({
+				type: "enderaserpath"
+			});
+			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
+			if(final) this.addUserDrawing(lastPath)
+			this.erasePath(lastPath,this.local.context,this.local);
+		};
 		// Functions for the current user path (user path = path we are drawing)
 		Paint.prototype.addUserPath = function addUserPath (color) {
 			this.localUserPaths.push({
@@ -7631,6 +7752,7 @@ module.exports=(...args)=>{
 
 					// TODO refactor this to use drawFunctions
 					var context = paint.effectsCanvasCtx;
+					context.globalCompositeOperation="destination-over";
 					context.beginPath();
 					context.arc(paint.lastLinePoint[0], paint.lastLinePoint[1], (paint.current_size * paint.local.zoom) / 2, 0, 2 * Math.PI, true);
 					context.fillStyle = paint.current_color.toRgbString();
@@ -7692,7 +7814,7 @@ module.exports=(...args)=>{
 
 					// TODO refactor this to use drawFunctions
 					var context = paint.effectsCanvasCtx;
-					
+					context.globalCompositeOperation="destination-over";
 					context.beginPath();
 					context.arc(paint.lastLinePoint[0], paint.lastLinePoint[1], (paint.current_size * paint.local.zoom) / 2, 0, 2 * Math.PI, true);
 					context.closePath();
@@ -7746,11 +7868,11 @@ module.exports=(...args)=>{
 				var scaledCoords = paint.scaledCoords(targetCoords, event);
 
 				if ((event.type == "mousedown" || event.type == "touchstart")) {
-					if(!paint.trianglePoints || paint.trianglePoints.length == 3){
+					if(!paint.trianglePoints || paint.trianglePoints.length == 2){
 						paint.trianglePoints=[scaledCoords];	
 					}else{
 						paint.trianglePoints.push(scaledCoords);
-						if(paint.trianglePoints.length==3){
+						if(paint.trianglePoints.length==2){
 							// Draw final triangle here	
 							paint.addUserDrawing({
 								type: "triangle",
@@ -7758,8 +7880,6 @@ module.exports=(...args)=>{
 								y: Math.round((paint.local.leftTopY + (paint.trianglePoints[0][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								x1: Math.round((paint.local.leftTopX + (paint.trianglePoints[1][0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								y1: Math.round((paint.local.leftTopY + (paint.trianglePoints[1][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
-								x2: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
-								y2: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								size: paint.current_size,
 								color: paint.current_color,
 								stroke_size: paint.current_stroke_size,
@@ -7780,35 +7900,18 @@ module.exports=(...args)=>{
 					// TODO refactor this to use drawFunctions
 					var context = paint.effectsCanvasCtx;
 					if(paint.trianglePoints.length ==1){
-						context.beginPath();
-						context.arc(paint.trianglePoints[0][0], paint.trianglePoints[0][1], 2, 0, 2 * Math.PI, true);
-						context.fillStyle = paint.current_stroke_color.toRgbString();
-						context.fill();
-						
+						context.globalCompositeOperation="destination-over";
 						context.beginPath();
 						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
-						context.lineTo(scaledCoords[0], scaledCoords[1]);			
-						context.strokeStyle = paint.current_stroke_color.toRgbString();
-						context.lineWidth = 2 ;
-						context.stroke();
-
-						context.beginPath();
-						context.arc(scaledCoords[0], scaledCoords[1], 2, 0, 2 * Math.PI, true);
-						context.fillStyle = paint.current_stroke_color.toRgbString();
-						context.fill();
-					}else{
-						context.beginPath();
-						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
-						context.lineTo(paint.trianglePoints[1][0], paint.trianglePoints[1][1]);			
-						context.lineTo(scaledCoords[0], scaledCoords[1]);			
+						context.lineTo(scaledCoords[0], paint.trianglePoints[0][1]);			
+						context.lineTo( ( scaledCoords[0] + paint.trianglePoints[0][0] )/2 , paint.trianglePoints[0][1] - ((scaledCoords[0] - paint.trianglePoints[0][0]) * (Math.sqrt(3)/2) ) );			
 						context.strokeStyle = paint.current_stroke_color.toRgbString();
 						context.fillStyle = paint.current_color.toRgbString();
 						context.lineWidth = paint.current_stroke_size ;
 						context.closePath();
 						context.stroke();
 						context.fill();
-					}
-						
+					}	
 				}
 			},
 			ellipse: function ellipse (paint, event) {
@@ -7837,7 +7940,7 @@ module.exports=(...args)=>{
 							paint.trianglePoints=paint.trianglePoints.map(function(cords){
 								return [
 									Math.round((paint.local.leftTopX + (cords[0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
-									Math.round((paint.local.leftTopX + (cords[1] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION
+									Math.round((paint.local.leftTopY + (cords[1] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION
 								];
 							});
 							// Draw final triangle here	
@@ -7860,11 +7963,10 @@ module.exports=(...args)=>{
 					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 					// TODO refactor this to use drawFunctions
 					var context = paint.effectsCanvasCtx;
+					context.globalCompositeOperation="destination-over";
 					context.beginPath();
 					context.strokeStyle = paint.current_color.toRgbString();
 					context.lineWidth = 2 ;
-					
-					console.log(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
 					
 					context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
 					if(paint.trianglePoints.length ==1){
@@ -7895,11 +7997,11 @@ module.exports=(...args)=>{
 				var scaledCoords = paint.scaledCoords(targetCoords, event);
 
 				if ((event.type == "mousedown" || event.type == "touchstart")) {
-					if(!paint.trianglePoints || paint.trianglePoints.length == 3){
+					if(!paint.trianglePoints || paint.trianglePoints.length == 2){
 						paint.trianglePoints=[scaledCoords];	
 					}else{
 						paint.trianglePoints.push(scaledCoords);
-						if(paint.trianglePoints.length==3){
+						if(paint.trianglePoints.length==2){
 							// Draw final triangle here	
 							paint.addUserDrawing({
 								type: "rhombus",
@@ -7907,8 +8009,6 @@ module.exports=(...args)=>{
 								y: Math.round((paint.local.leftTopY + (paint.trianglePoints[0][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								x1: Math.round((paint.local.leftTopX + (paint.trianglePoints[1][0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								y1: Math.round((paint.local.leftTopY + (paint.trianglePoints[1][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
-								x2: Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
-								y2: Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 								size: paint.current_size,
 								color: paint.current_color,
 								stroke_size: paint.current_stroke_size,
@@ -7928,32 +8028,15 @@ module.exports=(...args)=>{
 					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 					// TODO refactor this to use drawFunctions
 					var context = paint.effectsCanvasCtx;
+					context.globalCompositeOperation="destination-over";
 					if(paint.trianglePoints.length ==1){
-						context.beginPath();
-						context.arc(paint.trianglePoints[0][0], paint.trianglePoints[0][1], 2, 0, 2 * Math.PI, true);
-						context.fillStyle = paint.current_stroke_color.toRgbString();
-						context.fill();
-						
+						var diffX=scaledCoords[0] - paint.trianglePoints[0][0];
+						var diffY=scaledCoords[1] - paint.trianglePoints[0][1];
 						context.beginPath();
 						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
-						context.lineTo(scaledCoords[0], scaledCoords[1]);			
-						context.lineWidth=paint.current_stroke_size;
-						context.strokeStyle=paint.current_stroke_color.toRgbString();
-						context.stroke();
-
-						context.beginPath();
-						context.arc(scaledCoords[0], scaledCoords[1], 2, 0, 2 * Math.PI, true);
-						context.fillStyle = paint.current_stroke_color.toRgbString();
-						context.fill();
-					}else{
-						var diffX=scaledCoords[0] - paint.trianglePoints[1][0];
-						var diffY=scaledCoords[1] - paint.trianglePoints[1][1];
-				
-						context.beginPath();
-						context.moveTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1]);
-						context.lineTo(paint.trianglePoints[1][0], paint.trianglePoints[1][1]);			
-						context.lineTo(scaledCoords[0], scaledCoords[1]);			
-						context.lineTo(diffX + paint.trianglePoints[0][0], diffY + paint.trianglePoints[0][1]);
+						context.lineTo(scaledCoords[0], paint.trianglePoints[0][1]);			
+						context.lineTo(scaledCoords[0], paint.trianglePoints[0][1] - (diffX));
+						context.lineTo(paint.trianglePoints[0][0], paint.trianglePoints[0][1] - (diffX));
 						context.lineWidth=paint.current_stroke_size;
 						context.strokeStyle=paint.current_stroke_color.toRgbString();
 						context.fillStyle = paint.current_color.toRgbString();
@@ -7961,7 +8044,6 @@ module.exports=(...args)=>{
 						context.stroke();
 						context.fill();
 					}
-						
 				}
 			},
 			circle: function circle (paint, event) {
@@ -8009,6 +8091,7 @@ module.exports=(...args)=>{
 					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 					// TODO refactor this to use drawFunctions
 					var context = paint.effectsCanvasCtx;
+					context.globalCompositeOperation="destination-over";
 					if(paint.drawingCircle){
 						let circleRadius=Math.max(Math.abs(paint.lastLinePoint[0] - scaledCoords[0]),Math.abs(paint.lastLinePoint[1] - scaledCoords[1]));
 						context.beginPath();
@@ -8092,6 +8175,7 @@ module.exports=(...args)=>{
 						// Draw the current mouse position
 						var context = paint.effectsCanvasCtx;
 						context.beginPath();
+						context.globalCompositeOperation="destination-over";
 						context.arc(scaledCoords[0], scaledCoords[1], (paint.current_size * paint.local.zoom) / 2, 0, 2 * Math.PI, true);
 
 						if (paint.current_color.type == "gradient") {
@@ -8116,12 +8200,12 @@ module.exports=(...args)=>{
 					if (paint.brushing) {
 						paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 						var context = paint.effectsCanvasCtx;
-						
 						paint.localBrushStrokes.push(scaledCoords);
 						paint.brushStrokes.push([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 					                            Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
 						for (var i = 1; i < paint.localBrushStrokes.length; i ++){
 					  	context.beginPath();
+							context.globalCompositeOperation="destination-over";
 							context.moveTo(paint.localBrushStrokes[i-1][0], paint.localBrushStrokes[i-1][1]);
 							context.lineTo(paint.localBrushStrokes[i][0], paint.localBrushStrokes[i][1]);			
 							context.strokeStyle = paint.current_color.toRgbString();
@@ -8203,8 +8287,8 @@ module.exports=(...args)=>{
 				var scaledCoords = paint.scaledCoords(targetCoords, event);
 				if (event.type == "mousedown" || event.type == "touchstart") {
 					paint.brushing = true;
-					paint.addUserPath(new tinycolor('white'));
-					paint.addUserPathPoint([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+					paint.addEraserPath();
+					paint.addEraserPathPoint([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 					                        Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
 
 					// Clear the previous mouse dot
@@ -8213,7 +8297,7 @@ module.exports=(...args)=>{
 				}
 
 				if (event.type == "mouseup" || event.type == "touchend" || event.type == "mouseleave") {
-					if(paint.brushing) paint.endUserPath();
+					paint.endEraserPath(true);
 					paint.brushing = false;
 				}
 
@@ -8231,7 +8315,7 @@ module.exports=(...args)=>{
 						context.fillStyle = "white";
 						
 						context.fill();
-						
+						context.closePath();
 						// Save the last move point for efficient clearing
 						paint.lastMovePoint[0] = scaledCoords[0];
 						paint.lastMovePoint[1] = scaledCoords[1];
@@ -8240,8 +8324,9 @@ module.exports=(...args)=>{
 
 					// If the last brush point is set we are currently drawing
 					if (paint.brushing) {
-						paint.addUserPathPoint([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						paint.addEraserPathPoint([Math.round((paint.local.leftTopX + (scaledCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
 					                            Math.round((paint.local.leftTopY + (scaledCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION]);
+						paint.endEraserPath();
 					}
 				}
 			},
@@ -8337,7 +8422,8 @@ module.exports=(...args)=>{
 					paint.lastMovePoint = paint.lastMovePoint || [0, 0];
 
 					paint.effectsCanvasCtx.font = paint.current_size * paint.local.zoom + "px Verdana, Geneva, sans-serif";
-
+					paint.effectsCanvasCtx.globalCompositeOperation="destination-over";
+							
 					// Remove the old text and draw the new one (use half height margin)
 					paint.effectsCanvasCtx.clearRect(paint.lastMovePoint[0],
 					                                 paint.lastMovePoint[1] - (paint.current_size * paint.local.zoom * 1.5),
@@ -8352,6 +8438,7 @@ module.exports=(...args)=>{
 				}
 
 				if (event == "redraw") {
+					paint.effectsCanvasCtx.globalCompositeOperation="destination-over";
 					paint.effectsCanvasCtx.font = paint.current_size * paint.local.zoom + "px Verdana, Geneva, sans-serif";
 					// Remove the old text and draw the new one (use half height margin)
 					paint.effectsCanvasCtx.clearRect(paint.lastMovePoint[0],
@@ -8501,13 +8588,13 @@ module.exports=(...args)=>{
 
 		Paint.prototype.drawFunctions = {
 			brush: function (context, drawing, tiledCanvas) {
-				
 				let topLeftX=drawing.points[0][0];
 				let topLeftY=drawing.points[0][1];
 				let bottomRightX=drawing.points[0][0];
 				let bottomRightY=drawing.points[0][1];
 				for (var i = 1; i < drawing.points.length; i ++){
 			  	context.beginPath();
+					context.globalCompositeOperation="source-over";
 					context.moveTo(drawing.points[i-1][0], drawing.points[i-1][1]);
 					context.lineTo(drawing.points[i][0], drawing.points[i][1]);			
 					context.strokeStyle = drawing.color.toRgbString();
@@ -8529,13 +8616,29 @@ module.exports=(...args)=>{
 				}
 			},
 			eraser: function (context, drawing, tiledCanvas) {
+				let topLeftX=drawing.points[0][0];
+				let topLeftY=drawing.points[0][1];
+				let bottomRightX=drawing.points[0][0];
+				let bottomRightY=drawing.points[0][1];
+				context.save();
 				context.beginPath();
-				context.arc(drawing.x, drawing.y, drawing.size, 0, 2 * Math.PI, true);
-				context.fillStyle = 'white';
-				context.fill();
-
+				context.globalCompositeOperation="destination-out";
+				for (var i = 1; i < drawing.points.length; i ++){
+			  	context.moveTo(drawing.points[i-1][0], drawing.points[i-1][1]);
+					context.lineTo(drawing.points[i][0], drawing.points[i][1]);			
+				  topLeftX=Math.min(topLeftX,drawing.points[i][0]);
+		      topLeftY=Math.min(topLeftY,drawing.points[i][1]);
+		      bottomRightX=Math.max(bottomRightX,drawing.points[i][0]);
+		      bottomRightY=Math.max(bottomRightY,drawing.points[i][1]);
+			  }
+		  	context.lineWidth = drawing.size ;
+				context.lineCap = "round";
+				context.stroke();
+				context.closePath();
+				context.restore();
+				
 				if (tiledCanvas) {
-					tiledCanvas.drawingRegion(drawing.x, drawing.y, drawing.x, drawing.y, drawing.size);
+					tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
 			},
@@ -8550,7 +8653,8 @@ module.exports=(...args)=>{
 			},
 			line: function (context, drawing, tiledCanvas) {
 				context.beginPath();
-
+				context.globalCompositeOperation="source-over";
+				
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
 				
@@ -8571,6 +8675,7 @@ module.exports=(...args)=>{
         var angle = Math.atan2(drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE-drawing.y,drawing.x1-drawing.x);
 
 				context.beginPath();
+				context.globalCompositeOperation="source-over";
 				
 				context.strokeStyle = drawing.color.toRgbString();
 				context.lineWidth = drawing.size;
@@ -8582,7 +8687,8 @@ module.exports=(...args)=>{
 				context.stroke();
 				
 				context.beginPath();
-        context.moveTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
+        context.globalCompositeOperation="source-over";
+				context.moveTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
         context.lineTo(drawing.x1-headlen*Math.cos(angle-Math.PI/7),drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE -headlen*Math.sin(angle-Math.PI/7));
 
         //path from the side point of the arrow, to the other side point
@@ -8606,10 +8712,10 @@ module.exports=(...args)=>{
 			},
 			triangle: function (context, drawing, tiledCanvas) {
 				context.beginPath();
-
+				context.globalCompositeOperation="source-over";
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
-				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
-				context.lineTo(drawing.x2, drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x1, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);			
+				context.lineTo( ( drawing.x1 + drawing.x )/2 , drawing.y - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )  + this.FIX_CANVAS_PIXEL_SIZE );			
 				context.strokeStyle = drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
 				context.lineWidth = drawing.stroke_size;
@@ -8618,10 +8724,10 @@ module.exports=(...args)=>{
 				context.fill();
 				
 				if (tiledCanvas) {
-					var topLeftX=Math.min(drawing.x,drawing.x1,drawing.x2);
-					var topLeftY=Math.min(drawing.y,drawing.y1,drawing.y2);
-					var bottomRightX=Math.max(drawing.x,drawing.x1,drawing.x2);
-					var bottomRightY=Math.max(drawing.y,drawing.y1,drawing.y2);
+					var topLeftX=Math.min(drawing.x,drawing.x1);
+					var topLeftY=Math.min(drawing.y,drawing.y - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) ));
+					var bottomRightX=Math.max(drawing.x,drawing.x1);
+					var bottomRightY=Math.max(drawing.y,drawing.y - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) ));
 					
 					tiledCanvas.drawingRegion(topLeftX - drawing.stroke_size , topLeftY -drawing.stroke_size, bottomRightX + drawing.stroke_size, bottomRightY + drawing.stroke_size, drawing.size);
 					tiledCanvas.executeNoRedraw();
@@ -8629,13 +8735,13 @@ module.exports=(...args)=>{
 			},
 			rhombus: function (context, drawing, tiledCanvas) {
 				context.beginPath();
-				var diffX=drawing.x2 - drawing.x1;
-				var diffY=drawing.y2 - drawing.y1;
+				context.globalCompositeOperation="source-over";
+				var diffX=drawing.x1 - drawing.x;
+				var diffY=drawing.y1 - drawing.y;
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
-				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
-				context.lineTo(drawing.x2, drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE);
-				context.lineTo(diffX + drawing.x, diffY + drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
-				context.lineTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x1, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x1, drawing.y - diffX + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x, drawing.y - diffX + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineWidth=drawing.stroke_size;
 				context.strokeStyle=drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
@@ -8644,10 +8750,10 @@ module.exports=(...args)=>{
 				context.fill();
 				
 				if (tiledCanvas) {
-					var topLeftX=Math.min(drawing.x,drawing.x1,drawing.x2,diffX);
-					var topLeftY=Math.min(drawing.y,drawing.y1,drawing.y2,diffY);
-					var bottomRightX=Math.max(drawing.x,drawing.x1,drawing.x2,diffX);
-					var bottomRightY=Math.max(drawing.y,drawing.y1,drawing.y2,diffY);
+					var topLeftX=Math.min(drawing.x,drawing.x1,drawing.x - diffX);
+					var topLeftY=Math.min(drawing.y,drawing.y1,drawing.y - diffX);
+					var bottomRightX=Math.max(drawing.x,drawing.x1,drawing.x - diffX);
+					var bottomRightY=Math.max(drawing.y,drawing.y1,drawing.y - diffY);
 					
 					tiledCanvas.drawingRegion(topLeftX - drawing.stroke_size, topLeftY - drawing.stroke_size, bottomRightX + drawing.stroke_size, bottomRightY + drawing.stroke_size, drawing.size);
 					tiledCanvas.executeNoRedraw();
@@ -8655,6 +8761,7 @@ module.exports=(...args)=>{
 			},
 			ellipse: function (context, drawing, tiledCanvas) {
 				context.beginPath();
+				context.globalCompositeOperation="source-over";
 				context.strokeStyle = drawing.color.toRgbString();
 				context.moveTo(drawing.points[0][0], drawing.points[0][1]);
 				context.lineWidth = 2 ;
@@ -8684,12 +8791,15 @@ module.exports=(...args)=>{
 			circle: function (context, drawing, tiledCanvas) {
 				let circleRadius=Math.max(Math.abs(drawing.x - drawing.x1),Math.abs(drawing.y - drawing.y1));
 				context.beginPath();
+				context.globalCompositeOperation="source-over";
 				context.arc(drawing.x1, drawing.y1, circleRadius, 0, 2 * Math.PI, true);
 				context.fillStyle = drawing.color.toRgbString();
 				context.lineWidth=drawing.stroke_size;
 				context.strokeStyle=drawing.stroke_color.toRgbString();
 				context.stroke();
 				context.fill();
+				context.closePath();
+				
 				if (tiledCanvas) {
 					let topLeftX=drawing.x1 - circleRadius - drawing.stroke_size;
 					let topLeftY=drawing.y1-circleRadius - drawing.stroke_size;
@@ -8708,35 +8818,58 @@ module.exports=(...args)=>{
 			    var y = 0;
 			    var w = canvas.width;
 			    var h = canvas.height;
-			    
 			    var xy = 10;
-			    context.beginPath();
-			    context.lineWidth = 0.5;
-			    
+			    var counter=1;
 			    while (y < h) {
+			      context.beginPath();
+			      if(counter % 4 ==0){
+			      	context.lineWidth = 1;
+			      	context.strokeStyle='#000000';
+				    }else if(counter % 2 ==0){
+			      	context.lineWidth = 0.5;
+			      	context.strokeStyle='#000000';
+				    }else{
+				    	context.lineWidth = 0.3;
+			      	context.strokeStyle='#000000';
+				    }
 			      y = y + dy;
 			      context.moveTo(x, y);
 			      context.lineTo(w, y);
 			      context.stroke();
+			      context.closePath();
 			      
 			      xy += 10;  
+			      counter +=1;
 			    }
 			    
 			    y = 0;  
 			    xy =10; 
+			    counter =1;
 			    while (x < w) {
+			      context.beginPath();
+			      if(counter % 4 ==0){
+			      	context.lineWidth = 1;
+			      	context.strokeStyle='#000000';
+				    }else if(counter % 2 ==0){
+			      	context.lineWidth = 0.5;
+			      	context.strokeStyle='#000000';
+				    }else{
+				    	context.lineWidth = 0.3;
+			      	context.strokeStyle='#000000';
+				    }
 			      x = x + dx;
 			      context.moveTo(x, y);  
 			      context.lineTo(x,h);  
 			      context.stroke();   
+			      context.closePath();
 			      xy+=10;  
+			      counter +=1;
 			    }
 			  }
-			  console.log(drawing,context);
 			  context.clearRect(0, 0, canvas.width, canvas.height);
 			  if(drawing.showGrid){
-					drawScreen(context);
-				}else{
+			  	drawScreen(context)	
+			  }else{
 					//context.clearRect(0, 0, canvas.width, canvas.height);
 				}
 			},
@@ -8764,6 +8897,7 @@ module.exports=(...args)=>{
 				this.drawPath(drawing, context, tiledCanvas);
 			},
 			text: function (context, drawing, tiledCanvas) {
+				context.globalCompositeOperation="source-over";
 				context.font = drawing.size + "px Verdana, Geneva, sans-serif";
 				context.fillStyle = drawing.color.toRgbString();
 

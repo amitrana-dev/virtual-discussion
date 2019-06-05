@@ -53,19 +53,21 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
             resolve(result)
           }else{
             socket.emit('isBreakoutActive', true);
-            if(!user.presenter){
               REDIS.hget('breakouts', discussionId, (err,breakouts)=>{
                 breakouts=JSON.parse(breakouts);
-                if(breakouts[0].indexOf(user.identity) != -1){
-                  discussionId= discussionId+'-0';
+                if(!user.presenter){
+                  breakouts.every(function(breakout, index){
+                    if(breakout.participants.indexOf(user.identity) != -1){
+                      discussionId = discussionId+'-'+index.toString();
+                      return false;
+                    }
+                    return true;
+                  });
                 }else{
-                  discussionId= discussionId+'-1';
+                  socket.emit('breakouts',breakouts);
                 }
                 resolve(result);
               })
-            }else{
-              resolve(result);  
-            }
           }
         })
       })

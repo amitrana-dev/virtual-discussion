@@ -173,6 +173,9 @@ import Toasted from 'vue-toasted';
           addParticipants(peers, true)
           that.totalParticipants = Object.keys(that.participants).length
         })
+        that.socket.on('breakouts', function (breakouts) {
+          that.breakouts = breakouts;
+        })
         that.socket.on('peer-connect', function (data) {
           data.user.peerId = data.socketId
           addParticipants(data.user, false)
@@ -382,6 +385,8 @@ import Toasted from 'vue-toasted';
       createBreakout: function () {
         let that =this;
         that.isBreakoutActive=true;
+        that.breakouts.push(that.breakout);
+        that.breakout={participants: [],groupLeader: null,timeOut: 60};
         that.socket.emit('createbreakout',that.breakouts);
       },
       changeRoom: function (identity, room) {
@@ -502,6 +507,7 @@ import Toasted from 'vue-toasted';
             tabItem.name = 'White Board'
             this.addContainer(tabItem)
             this.socket.emit('tabadd', JSON.stringify(tabItem))
+            this.socket.emit('tabchanged', tabId)
             break
           case 'media':
             break
@@ -512,6 +518,7 @@ import Toasted from 'vue-toasted';
             tabItem.language = 'javascript'
             this.addContainer(tabItem)
             this.socket.emit('tabadd', JSON.stringify(tabItem))
+            this.socket.emit('tabchanged', tabId)
             break
         }
         this.toggleMenu()

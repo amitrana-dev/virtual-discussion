@@ -87,7 +87,6 @@ module.exports={
         });
         that.socket.on('grid',function (event,tabId) {
           if (tabId !== that.item.id) return
-          console.log(event.show);
           that.paint.showGrid(event.show, true);  
         });
         that.socket.on('undo',function (tabId, typeOfBoard, pageId) {
@@ -108,6 +107,7 @@ module.exports={
       let that=this;
       let currentPage;
       that.paint=require('../paint/paint')(document.getElementById(that.item.id))
+
       if(that.item.type==='content'){
         let currentPage=that.getCurrentPage();
         that.paint.addBackgroundImage(currentPage.image);

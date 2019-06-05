@@ -151,7 +151,7 @@
                     </div>
                   </div>
                   <!-- Last participant should be presenter itself -->
-                  <div class="row" v-if="Object.keys(remaining_participants).length > 1">
+                  <div class="row" v-if="Object.keys(remaining_participants).length > 1 || breakout.participants.length > 0">
                     <div class="col-sm-6">
                       <h6>Participants</h6>
                       <ul class="participants list-group">

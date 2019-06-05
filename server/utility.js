@@ -94,7 +94,7 @@ var Utility = function () {
         if (workplace) {
           socket.to(discussionId).emit('endsession')
           workplace = JSON.parse(workplace)
-          workplace['closed']=true;
+          //workplace['closed']=true;
           redis.hset('workplace', discussionId, JSON.stringify(workplace))
         }
       });
