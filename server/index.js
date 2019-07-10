@@ -33,11 +33,15 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
   })
   REDIS.del(['presenters','mapSocketToDiscussion','participants']);
   function onConnect (socket) {
+    let originalDiscussionId=socket.handshake.query['discussion_id']
+ 
     let discussionId = socket.handshake.query['discussion_id']
     let userToken = socket.handshake.query['token']
     let discussionInfo=null
     let user=null
     let loggedInUser=null
+    let myBreakout;
+    let myBreakoutIndex;
     if (CONFIG.DEBUG) { console.log(userToken + ' connected on socket ' + socket.id) }
     
     Promise.all([DISCUSSION.getInfo(discussionId,REDIS),USER.getUserInfoForDiscussion(userToken,discussionId)])
@@ -48,29 +52,36 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
       loggedInUser=Object.assign({},user);
       delete user.id;
       return new Promise(function(resolve, reject){
-        REDIS.hget('isBreakoutActive', discussionId, (err,isActive)=>{
-          if(err || !isActive){
-            resolve(result)
-          }else{
-            socket.emit('isBreakoutActive', true);
-              REDIS.hget('breakouts', discussionId, (err,breakouts)=>{
-                breakouts=JSON.parse(breakouts);
-                if(!user.presenter){
-                  breakouts.every(function(breakout, index){
-                    if(breakout.participants.indexOf(user.identity) != -1){
-                      discussionId = discussionId+'-'+index.toString();
-                      return false;
-                    }
-                    return true;
-                  });
-                }else{
-                  socket.emit('breakouts',breakouts);
-                }
-                resolve(result);
-              })
+        REDIS.hget('breakouts', discussionId, (err,breakouts)=>{
+          if(!breakouts){
+            resolve();
+            return;
           }
+          breakouts=JSON.parse(breakouts);
+          let isAnyChange=false;
+          let existDiscussionId=discussionId;
+          breakouts = breakouts.filter(function(breakout, index){
+            let timeLimit=new Date(breakout.startTime + breakout.timeOut * 60000 );
+            // this breakout is no longer available
+            if(timeLimit <= new Date()){
+              isAnyChange= true;
+              return false;
+            }
+
+            if(breakout.participants.indexOf(user.identity) != -1){
+              myBreakout=breakout;
+              myBreakoutIndex=index;
+              discussionId = discussionId+'-'+index.toString();
+            }
+            return true;
+          });
+          if(isAnyChange) REDIS.hset('breakouts', existDiscussionId, JSON.stringify(breakouts) ,_=>{});  
+          if(user.presenter){
+            socket.emit('breakouts',breakouts);
+          }
+          resolve();
         })
-      })
+      });
     }).then((result)=>{
       // Join user to discusison
       socket.join(discussionId)
@@ -81,9 +92,51 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
       });
       socket.on('createbreakout', function (breakouts) {
         REDIS.hset('breakouts', discussionId, JSON.stringify(breakouts) ,_=>{})  
-        REDIS.hset('isBreakoutActive', discussionId, true ,_=>{});
+        //REDIS.hset('isBreakoutActive', discussionId, true ,_=>{});
         socket.to(discussionId).emit('reconnect');
-        socket.emit('reconnect');
+        //socket.emit('reconnect');
+      });
+
+      socket.on('enterroom', function (index) {
+        if(!user.presenter) return;
+        REDIS.hget('breakouts', discussionId, (err,breakouts)=>{
+          breakouts=JSON.parse(breakouts);
+          // Get back to common room
+          if(index == -1){
+            breakouts = breakouts.map(function(breakout){
+              let indexOfUser=breakout.participants.indexOf(user.identity);
+              if(indexOfUser !== -1){
+                breakout.participants.splice(indexOfUser);
+              }
+              return breakout;
+            });
+          }else{
+            // enter a specific room
+            breakouts[index].participants.push(user.identity);
+          }
+          REDIS.hset('breakouts', discussionId, JSON.stringify(breakouts) ,_=>{})    
+          socket.emit('reconnect');
+        });
+      });
+      socket.on('exitbreakout',function (index) {
+        if(!user.presenter) return;
+        REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
+          breakouts=JSON.parse(breakouts);
+          breakouts[index].participants= breakouts[index].participants.filter(function(identity){
+            return user.identity !== identity;
+          })
+          REDIS.hset('breakouts', originalDiscussionId, JSON.stringify(breakouts) ,_=>{})    
+        });
+      });
+      socket.on('endbreakout', function (index) {
+        if(!user.presenter) return;
+        
+        REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
+          breakouts=JSON.parse(breakouts);
+          breakouts.splice(index, 1);
+          REDIS.hset('breakouts', originalDiscussionId, JSON.stringify(breakouts) ,_=>{})    
+          socket.to(originalDiscussionId + '-'+index.toString()).emit('reconnect');
+        });
       });
       socket.on('changepermission',function(peerId, action, value){
         REDIS.get('participants', (err, participants) => {
@@ -110,6 +163,12 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
 
       // send discussion details
       socket.emit('discussiondetail',discussionInfo);
+      
+      if(myBreakout){
+        // send breakout info
+        socket.emit('breakoutinfo',{breakout: myBreakout,breakoutIndex: myBreakoutIndex});
+      }
+      
       // send info that user is valid
       socket.emit('validuser',user);
       

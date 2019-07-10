@@ -103,6 +103,23 @@ var Whiteboard = function () {
       })
       socket.to(discussionId).emit('grid', event, tabId, typeOfBoard, pageId);
     });
+    socket.on('clearWorkspace', function (tabId, typeOfBoard, pageId) {
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('clearWorkspace ' + discussionId) }
+      socket.to(discussionId).emit('clearWorkspace', tabId, typeOfBoard, pageId);
+      redis.hget('workplace', discussionId, (err, workplace) => {
+        if (err && CONFIG.DEBUG) console.warn(err)
+        if (workplace) {
+          workplace=initWorkPlace(workplace, tabId, typeOfBoard, pageId);
+          if(typeOfBoard === 'content'){
+            workplace['content'][tabId]['pages'][pageId]['drawings'] =[]  
+          }else{
+            workplace['whiteboard'][tabId]['drawings'] = []
+          }
+          redis.hset('workplace', discussionId, JSON.stringify(workplace))
+        }
+      })
+    });
     socket.on('undo', function (tabId, typeOfBoard, pageId) {
       let discussionId = mapSocketToDiscussion[socket.id]
       if (CONFIG.DEBUG) { console.log('undo ' + discussionId) }
@@ -120,6 +137,7 @@ var Whiteboard = function () {
         }
       })
     });
+
   }
   return {
     init: initBoard

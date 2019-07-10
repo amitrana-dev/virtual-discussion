@@ -6516,7 +6516,65 @@ module.exports=(...args)=>{
 			this.backgroundImage=image;
 			this.drawDrawing("background", {type: 'bgImage',image: image});
 		};
+		Paint.prototype.clearWorkspace = function clearWorkspace (dontTriggerEvent){
+			this.localDrawings =[];
+			this.redrawLocals();
+			if(!dontTriggerEvent)
+			this.dispatchEvent({
+				type: "clearWorkspace"
+			});
+		};
+		Paint.prototype.openEqEditor= function openEqEditor (event){
+			var that=this;
+			var modalHtml='<div class="modal d-block" role="dialog">';
+						modalHtml +='<div class="modal-dialog modal-lg">';
+							modalHtml +='<div class="modal-content">';
+								modalHtml +='<div class="modal-header">';
+									modalHtml +='<h2>Equation Editor</h2>';
+								modalHtml +='</div>';
+								modalHtml +='<div class="modal-body">';
+									modalHtml +='<div class="row"><div class="col-sm-12"><div id="currentEquationToolbar"></div></div></div>';
+									modalHtml +='<div class="row"><div class="col-sm-12 mt-2"><textarea id="equationBox" class="form-control"></textarea></div></div>';
+									modalHtml +='<div class="row"><div class="col-sm-12 text-center mt-2"><img id="equationImage" /></div></div>';
+								modalHtml +='</div>';
+								modalHtml +='<div class="modal-footer">';
+									modalHtml +='<button type="button" class="btn btn-primary copy-val">Select</button>';
+									modalHtml +='<button type="button" class="btn btn-default close-editor">Close</button>';
+								modalHtml +='</div>';
+							modalHtml +='</div>';
+						modalHtml +='</div>';
+			modalHtml +='</div>';
+			var modalBackdropHtml='<div class="modal-backdrop fade show d-block"></div>';
+			that.equationModal=$(modalHtml).appendTo('body');
+			that.equationModalBackdrop=$(modalBackdropHtml).appendTo('body');
 
+			that.equationEditor=new EqTextArea('equationImage', 'equationBox');
+			EqEditor.moveto('currentEquationToolbar');
+			EqEditor.add(that.equationEditor,true); 
+			that.equationModal.find('#equationBox').focus();
+
+			that.equationModal.find('#currentEquationToolbar .panel map area').mouseover(function(e){
+				that.equationModal.find('#currentEquationToolbar #hover').css({'left': $(this).position().left,'top': $(this).position().top});
+			});
+			that.equationModal.find('.close-editor').click(function(){
+				EqEditor.moveto('equationToolbar');
+				that.equationModal.remove();
+				that.equationModalBackdrop.remove();
+			});
+			that.equationModal.find('.copy-val').click(function(){
+				EqEditor.moveto('equationToolbar');
+				that.currentEquation=that.equationEditor.exportEquation('safe');
+				
+				if(that.currentEquation === '') return;
+
+				that.currentEquationImage=$('<img style="position: absolute;" src="https://latex.codecogs.com/png.latex?'+that.currentEquation+'">').appendTo('.right-sidebar');
+				that.currentEquationImage.hide();
+
+				that.changeTool(event);
+				that.equationModal.remove();
+				that.equationModalBackdrop.remove();
+			});
+		};
 		Paint.prototype.showGrid = function showGrid (show,dontTriggerEvent) {
 			if(!dontTriggerEvent)
 			this.dispatchEvent({
@@ -7104,7 +7162,6 @@ module.exports=(...args)=>{
 			this.exectool("remove");
 			this.current_tool = tool;
 			this.trianglePoints=null;
-
 			this.effectsCanvas.style.opacity=1;
 			if(this.clearHighlightTimer) clearTimeout(this.clearHighlightTimer);
 			if(tool=='highlight') this.effectsCanvas.style.opacity=0.5;
@@ -7401,6 +7458,15 @@ module.exports=(...args)=>{
 				title: "Change the stroke color of the tool",
 				action: this._changeStrokeColor.bind(this)
 			}, {
+				name: "eqeditor",
+				type: "button",
+				html: "i",
+				elemClass: "fas fa-square-root-alt",
+				place: "left",
+				value: 'eqeditor',
+				title: "Add mathematical equation to the workspace",
+				action: this.openEqEditor.bind(this)
+			}, {
 				name: "tool-grid",
 				type: "button",
 				html: "i",
@@ -7409,6 +7475,14 @@ module.exports=(...args)=>{
 				place: "top",
 				title: "Toggle Grid",
 				action: this.showGrid.bind(this)
+			}, {
+				name: "tool-clear",
+				type: "button",
+				html: "i",
+				elemClass: "fa fa-sync",
+				place: "top",
+				title: "Clear Workspace",
+				action: this.clearWorkspace.bind(this)
 			}/*, {
 				name: "gradient",
 				type: "gradient",
@@ -8044,6 +8118,31 @@ module.exports=(...args)=>{
 						context.stroke();
 						context.fill();
 					}
+				}
+			},
+			eqeditor: function eqeditor(paint, event){
+				
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+				// add equation to canvas
+				if ((event.type == "mouseup" || event.type == "touchend")) {
+					paint.addUserDrawing({
+						type: "equation",
+						x: Math.round((paint.local.leftTopX + (paint.lastLinePoint[0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
+						y: Math.round((paint.local.leftTopY + (paint.lastLinePoint[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
+						image: paint.currentEquationImage.attr('src'),
+						meta: {equation: paint.currentEquation},
+						size: paint.current_size,
+						color: paint.current_color
+					});
+					paint.currentEquationImage.remove();
+					paint.changeTool('brush');
+				}
+				// show image over canvas
+				if ((event.type == "mousemove" || event.type == "touchmove")) {
+					paint.lastLinePoint=[scaledCoords[0],scaledCoords[1] - paint.currentEquationImage.get(0).clientHeight];
+					paint.currentEquationImage.css({left: scaledCoords[0] + 16 +'px',top: scaledCoords[1] + 42 - paint.currentEquationImage.get(0).clientHeight+'px'}).show();
 				}
 			},
 			circle: function circle (paint, event) {
@@ -8872,6 +8971,25 @@ module.exports=(...args)=>{
 			  }else{
 					//context.clearRect(0, 0, canvas.width, canvas.height);
 				}
+			},
+			equation: function (context, drawing, tiledCanvas){
+				if(!drawing.image) return;
+				var img = new Image();
+				img.onload = function() {
+					let imgWidth=img.width;
+					let imgHeight=img.height;
+					let topLeftX=drawing.x;
+					let topLeftY=drawing.y;
+					let bottomRightX=topLeftX+imgWidth;
+					let bottomRightY=topLeftY+imgHeight;
+					context.drawImage(this, topLeftX, topLeftY, imgWidth, imgHeight);
+					if (tiledCanvas) {
+						tiledCanvas.drawingRegion(topLeftX, topLeftY, bottomRightX, bottomRightY, 0);
+						tiledCanvas.executeNoRedraw();
+						tiledCanvas.redrawOnce();
+					}
+				};
+				img.src = drawing.image;
 			},
 			bgImage: function (context, drawing, tiledCanvas){
 				if(!drawing.image) return;

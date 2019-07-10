@@ -23,6 +23,9 @@ module.exports={
       goBack: function (){
         this.$emit('go-back');  
       },
+      deleteFolder: function (folder){
+        this.$emit('delete-folder', folder)
+      },
       changeFolder: function (folder) {
         this.$emit('load-folder', folder)
       },

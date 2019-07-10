@@ -680,6 +680,9 @@ div.content-nav .disabled{opacity: 0.5;}
 .content-item >a >i.fa-file-pdf,.content-item >a >img{height: 100px;}
 .content-item >a >i.fa-file-pdf{font-size: 6em;}
 .content-item >a.pdf-item{display: block; text-align: center;} 
+.content-item > a.folder-edit, .content-item > a.folder-delete{display: none; top: 0px; left: 110px;}
+.content-item > a.folder-edit{left: 80px;}
+.content-item:hover > a.folder-edit, .content-item:hover > a.folder-delete{display: block;}
 .no-edit #play-menu,.no-edit .language-chooser,.no-edit .white-board .control-container, .content-tabs .overlay{display:none;}
 .no-edit .content-tabs .overlay{display: block;}
 .content-tabs .overlay{width: 100%; height: 100%;}

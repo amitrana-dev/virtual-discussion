@@ -96,6 +96,13 @@ module.exports={
           }
           that.paint.undo(true);
         })
+        that.socket.on('clearWorkspace',function (tabId, typeOfBoard, pageId) {
+          if (tabId !== that.item.id) return
+          if(typeOfBoard === 'content'){
+            that.item.content[pageId].drawings =[];
+          }
+          that.paint.clearWorkspace(true);
+        })
       }
     },
     watch: {
@@ -154,6 +161,15 @@ module.exports={
           that.socket.emit('grid',event,that.item.id,'content',currentPage.id);  
         }else{
           that.socket.emit('grid',event,that.item.id, 'whiteboard');
+        }
+      });
+      that.paint.addEventListener("clearWorkspace", function (event) {
+        if(that.item.type==='content'){
+          currentPage=that.getCurrentPage();
+          currentPage.drawings = [];
+          that.socket.emit('clearWorkspace',that.item.id,'content',currentPage.id);  
+        }else{
+          that.socket.emit('clearWorkspace',that.item.id, 'whiteboard');
         }
       });
       that.paint.addEventListener("undo", function (event) {

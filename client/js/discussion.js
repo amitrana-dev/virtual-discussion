@@ -42,6 +42,8 @@ import Toasted from 'vue-toasted';
       participants: {},
       breakouts: [],
       breakout: {participants: [],groupLeader: null,timeOut: 60},
+      currentBreakout: null,
+      breakoutIndex: -1,
       remaining_participants: {},
       isBreakoutActive: false,
       totalParticipants: 0,
@@ -111,8 +113,8 @@ import Toasted from 'vue-toasted';
           let intervalTimer=setInterval(_=>{
            let secondRemain=that.calculateRemainingTime();
            if(secondRemain <= 0){
-            clearInterval(intervalTimer);
-            that.endSession();
+            //clearInterval(intervalTimer);
+            //that.endSession();
            } 
           },1000)
         })
@@ -242,6 +244,10 @@ import Toasted from 'vue-toasted';
         that.socket.on('folderadded', function(){
           that.changeContentPage(1);
         });
+        that.socket.on('folderdeleted', function(){
+          Vue.toasted.success('Folder deleted!', { position: 'bottom-right' }).goAway(1000)
+          that.changeContentPage(1);
+        })
         that.socket.on('fileadded', function () {
           Vue.toasted.success('File added successfully!', { position: 'bottom-right' }).goAway(1000)
           that.changeContentPage(1);
@@ -250,17 +256,20 @@ import Toasted from 'vue-toasted';
           Vue.toasted.error('File addition failed!', { position: 'bottom-right' }).goAway(1000)
         });
         that.socket.on('reconnect', function(){
-          that.socket.disconnect();
-          that.contentTabs = [];
-          that.currentTab=null;
-          that.socket.open();
+          window.location.reload()
         })
-        that.socket.on('isBreakoutActive', function(isActive){
-          that.isBreakoutActive=isActive;
-        })
+        // that.socket.on('isBreakoutActive', function(isActive){
+        //   that.isBreakoutActive=isActive;
+        // })
         that.socket.on('endsession', function(){
           that.endSession();
         });
+        that.socket.on('breakoutinfo', function(info){
+          that.currentBreakout=info.breakout;
+          that.course.startTime=info.breakout.startTime;
+          that.course.duration=info.breakout.timeOut;
+          that.breakoutIndex=info.breakoutIndex;
+        })
         that.socket.on('clearworkspace', function(){
           that.contentTabs = []
           that.currentTab=null
@@ -349,6 +358,7 @@ import Toasted from 'vue-toasted';
         let courseStartTime=moment(this.course.startTime);
         if(currentTime >= courseStartTime){
           let duration=moment.duration(courseStartTime.add(this.course.duration,'minutes').diff(currentTime));
+          if(duration.seconds() <= 0) return 0;
           this.remainingDuration.hours=duration.hours();
           this.remainingDuration.minutes=duration.minutes();
           this.remainingDuration.seconds=duration.seconds();
@@ -384,9 +394,9 @@ import Toasted from 'vue-toasted';
       },
       createBreakout: function () {
         let that =this;
-        that.isBreakoutActive=true;
+        //that.isBreakoutActive=true;
         that.breakouts.push(that.breakout);
-        that.breakout={participants: [],groupLeader: null,timeOut: 60};
+        that.breakout={participants: [],groupLeader: null,timeOut: 60,startTime: new Date().getTime()};
         that.socket.emit('createbreakout',that.breakouts);
       },
       changeRoom: function (identity, room) {
@@ -407,6 +417,17 @@ import Toasted from 'vue-toasted';
           that.breakout.participants.push(identity);
           if(that.remaining_participants[identity]) delete that.remaining_participants[identity];
         }
+      },
+      enterRoom: function (index) {
+        this.socket.emit('enterroom',index);
+      },
+      endBreakout: function (index) {
+        this.socket.emit('endbreakout',index);
+        window.location.reload();
+      },
+      exitBreakout: function(index){
+        this.socket.emit('exitbreakout',index);
+        window.location.reload();
       },
       manageBreakout: function () {
         let that=this
@@ -622,7 +643,10 @@ import Toasted from 'vue-toasted';
       addFolder: function (folderName){
         this.socket.emit('addfolder', folderName, this.showPrivate, this.currentFolder.id ? this.currentFolder.id : 0);
       },
-      loadFolder: function (folder) {
+      deleteFolder: function (folder){
+        this.socket.emit('deletefolder', folder.id);
+      },
+      loadFolder: function (folder){
         let that=this;
         that.currentFolder=folder;
         that.changeContentPage(1);

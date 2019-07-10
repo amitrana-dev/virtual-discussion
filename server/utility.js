@@ -310,6 +310,56 @@ var Utility = function () {
         return;
       }
     });
+    socket.on('deletefolder', function(folderId){
+      let childFolders=[];
+      function getFolders(folderIds){
+        return new Promise(function(resolve, reject){
+          CONN.query("SELECT id from media_categories WHERE parent_id IN (?) AND user_id=?",[folderIds, loggedInUser.id], function (error, results, fields) {
+            if(error) return reject(error);
+            if(results.length <= 0){
+              resolve(); 
+            }else{
+              let childIds=[];
+              results.forEach(function(folder){
+                childIds.push(folder.id);
+                childFolders.push(folder.id)
+              });
+              getFolders(childIds).then(function(){
+                resolve();
+              })
+            }
+          })
+        })
+      }
+
+      getFolders([folderId]).then(function(){
+        childFolders.push(folderId);
+        return Promise.all([
+          new Promise(function(resolve,reject){
+            CONN.query("DELETE from media_categories WHERE id IN (?) AND user_id=?",[childFolders, loggedInUser.id], function (error, results, fields) {
+              if(error){
+                reject(error);
+              }else{
+                resolve();  
+              }
+            })
+          }),
+          new Promise(function(resolve,reject){
+            CONN.query("DELETE from media_files WHERE media_category_id IN (?) AND user_id=?",[childFolders, loggedInUser.id], function (error, results, fields) {
+              if(error){
+                reject(error);
+              }else{
+                resolve();  
+              }
+            })
+          })
+        ]);
+      }).then(function(){
+        socket.emit('folderdeleted');
+      }).catch(function(err){
+        console.log(err);
+      })
+    })
     socket.on('addfolder', function(folderName, isPrivate, folderId){
       CONN.query('INSERT INTO media_categories SET name=?,parent_id=?,user_id=?,is_private=?',[folderName, folderId, loggedInUser.id, isPrivate], function (error, results, fields) {
         socket.emit('folderadded');
@@ -381,11 +431,11 @@ var Utility = function () {
           let query='';
           let replacements=[];
           if(isPrivate){
-            query='SELECT C.id, C.name, C.parent_id FROM media_categories as C where C.is_private=1 and C.parent_id=? and C.user_id=?';
-            replacements=[folderId, loggedInUser.id]
+            query='SELECT C.id, C.name, C.parent_id, IF(C.user_id = ?,1,0) as editable FROM media_categories as C where C.is_private=1 and C.parent_id=? and C.user_id=?';
+            replacements=[loggedInUser.id, folderId, loggedInUser.id]
           }else{
-            query='SELECT C.id, C.name, C.parent_id FROM media_categories as C where C.is_private=0 and C.parent_id=?';
-            replacements=[folderId]
+            query='SELECT C.id, C.name, C.parent_id, IF(C.user_id = ?,1,0) as editable FROM media_categories as C where C.is_private=0 and C.parent_id=?';
+            replacements=[loggedInUser.id, folderId]
           }
           CONN.query(query, replacements, function (error, results, fields) {
            if(error) reject(error)

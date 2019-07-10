@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.css">
     <link rel="stylesheet" href="css/paint.css" />
     <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" type="text/css" href="https://latex.codecogs.com/css/equation-embed.css" />
     <title>Virtual Discussion</title>
     <!-- User "token" and "discussion id" will be replaced by query params if same key exist -->
     <meta key="token" value="5" />
@@ -18,9 +19,12 @@
   </head>
   <body>
     <div id="discussion_board" class="container-fluid">
+       <div id="equationToolbar" style="display: none;"></div>
        <div class="header-cont d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm nav-bar header-bar">
         <h5 class="my-0 mr-md-auto font-weight-normal">Virtual Discussion on {{course.title}}</h5>
         <nav class="my-2 my-md-0 mr-md-5" id="media-controls">
+          <span v-if="currentBreakout" class="font-weight-bold h3">Group - {{breakoutIndex}}</span>
+          <a  v-if="loggedInUser && loggedInUser.presenter  && currentBreakout" class="p-2 text-dark fa mr-3" href="javascript:void(0)" title="Exit to common room" @click="exitBreakout(breakoutIndex)"><i class="fas fa-sign-out-alt"></i></a>
           <a  v-if="loggedInUser && loggedInUser.presenter  && presenter" class="p-2 text-dark fa" href="javascript:void(0)" title="Record Session" id="toggleRecording" @click="toggleRecording"><i class="fa fa-circle" :class="{'text-danger': isRecordingAvailable}"></i> REC</a>
           <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 fa" href="javascript:void(0)" v-if="loggedInUser && loggedInUser.presenter " title="Share Screen" id="toggleScreen" @click="toggleScreen" :class="{'text-danger': isScreenShared,'text-dark': !isScreenShared}"><i class="fa fa-desktop"></i></a>
           <a v-if="loggedInUser && (loggedInUser.presenter || loggedInUser.permissions.video)" class="p-2 fa" href="javascript:void(0)" title="Toggle Video" id="toggleVideo" @click="toggleVideo" :class="{'text-danger': isVidAvailable,'text-dark': !isVidAvailable}"><i class="fa" :class="{'fa-video': isVidAvailable,'fa-video-slash': !isVidAvailable}"></i></a>
@@ -46,7 +50,7 @@
               </div>
             </div>
           </div>
-          <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 text-dark fa" href="javascript:void(0)" @click="manageBreakout()" title="Manage Breakout Room"><i class="fa fa-columns"></i></a>
+          <a v-if="loggedInUser && loggedInUser.presenter && !currentBreakout" class="p-2 text-dark fa" href="javascript:void(0)" @click="manageBreakout()" title="Manage Breakout Room"><i class="fa fa-columns"></i></a>
           <div class="dropdowns-wrapper">
             <div class="dropdown-container notification-container">
               <div class="notifications dropdown dd-trigger" @click="showNotification=!showNotification">
@@ -92,7 +96,7 @@
           <chat-box :socket="socket" :logged-in-user="loggedInUser" :participants="participants" ref="chatBox" @chat-group-changed="handleResize"></chat-box>
         </div>
         <div class="col-sm-12 d-xs-block mt-3 d-md-none"></div>
-        <div class="col-md-9 right-sidebar col-sm-12 px-0 px-sm-3" :class="{'no-edit': !loggedInUser || (!loggedInUser.presenter && !isBreakoutActive && !loggedInUser.permissions.edit)}">
+        <div class="col-md-9 right-sidebar col-sm-12 px-0 px-sm-3" :class="{'no-edit': !loggedInUser || (!loggedInUser.presenter && currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity)}">
           <!-- Tabs nav started -->
           <ul class="nav nav-tabs" id="play-menu">
             <li class="nav-item dropdown">
@@ -146,8 +150,8 @@
                   <div class="row" v-if="breakouts.length">
                     <div class="col-sm-4" v-for="(breakout,index) in breakouts">
                       <h4>Group - {{index+1}}</h4>
-                      <a href="javascript:void(0)" class="btn btn-primary mb-2">Enter Group</a>
-                      <a href="javascript:void(0)" class="btn btn-primary mb-2">End Breakout</a>
+                      <a v-if="!currentBreakout" href="javascript:void(0)" class="btn btn-primary mb-2" @click="enterRoom(index)">Enter Group</a>
+                      <a href="javascript:void(0)" class="btn btn-primary mb-2" @click="endBreakout(index)">End Breakout</a>
                     </div>
                   </div>
                   <!-- Last participant should be presenter itself -->
@@ -179,7 +183,7 @@
                 </div>
                 <div class="modal-footer">
                   <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('breakout')">Close</button>
-                  <button type="button" v-if="!isBreakoutActive" class="btn btn-primary" @click="createBreakout">Create Room</button>
+                  <button type="button"  v-if="breakout.participants.length > 0" class="btn btn-primary" @click="createBreakout">Create Room</button>
                 </div>
               </div>
             </div>
@@ -283,7 +287,7 @@
                 </div>
                 <div class="modal-body">
                   <div v-if="isLoadingContent" class="d-flex justify-content-center loader-container"><div class="lds-ripple"><div class="border-dark"></div><div class="border-dark"></div></div></div>
-                  <content-list v-if="!isLoadingContent"  :socket="socket" :current-folder="currentFolder" :show-private="showPrivate" :folder-list="folderList" :content-list="contentList" @add-folder="addFolder" @load-folder="loadFolder" @private-content="privateContent" @load-content="loadContent" @go-back="goBack"></content-list>
+                  <content-list v-if="!isLoadingContent"  :socket="socket" :current-folder="currentFolder" :show-private="showPrivate" :folder-list="folderList" :content-list="contentList" @add-folder="addFolder" @delete-folder="deleteFolder" @load-folder="loadFolder" @private-content="privateContent" @load-content="loadContent" @go-back="goBack"></content-list>
                   <p v-if="contentList.length <= 0 && showPrivate!=null">No content available</p>
                   <paginate
                     v-if="!isLoadingContent && showPrivate!=null"
@@ -366,6 +370,8 @@
           </div>
           <div class="content-item col-sm-3" v-if="showPrivate != null && folderList.length" v-for="folder in folderList">
             <a @click="changeFolder(folder)" href="javascript:void(0)"><i class="fa fa-folder fa-4 theme-color"></i><br>{{folder.name}}</a>
+            <a v-if="folder.editable" href="javascript:void(0)" class="position-absolute folder-edit"><i class="fa fa-edit fa-1 theme-color"></i></a>
+            <a @click="deleteFolder(folder)" v-if="folder.editable" href="javascript:void(0)" class="position-absolute folder-delete"><i class="fa fa-trash fa-1 theme-color"></i></a>
           </div>
         </div>
         <div class="row content-list" v-if="contentList.length">
@@ -457,5 +463,10 @@
     <script src="//cdn.webrtc-experiment.com/getScreenId.js"></script>
     <script src="js/screen/screen.js"></script>
     <script src="js/vendors.js" defer></script>
+    <script type="text/javascript" src="https://latex.codecogs.com/js/eq_config.js" ></script>
+    <script type="text/javascript" src="https://latex.codecogs.com/js/eq_editor-lite-18.js" ></script>
+    <script type="text/javascript">
+      EqEditor.embed('equationToolbar');
+    </script>
   </body>
 </html>
