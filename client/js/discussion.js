@@ -40,14 +40,25 @@ import Toasted from 'vue-toasted';
       discussionId: null,
       presenter: null,
       participants: {},
+      allParticipants: {},
+      breakoutName: '',
+      selectedBreakouts: [],
+      selectedParticipants: [],
+      participantToRemove:{},
+      participantList: [],
       breakouts: [],
-      breakout: {participants: [],groupLeader: null,timeOut: 60},
+      breakout: {name: '',participants: [],groupLeader: null,timeOut: 60},
       currentBreakout: null,
       breakoutIndex: -1,
+      addBreakoutIndex: -1,
       remaining_participants: {},
       isBreakoutActive: false,
       totalParticipants: 0,
-      showNotification: false,
+      showNotifications: false,
+      showParticipants: false,
+      showChatBox: true,
+      showWebCamBox: true,
+      notifications: [],
       showTimer: false,
       mediaList: [],
       isLoadingMedia: false,
@@ -152,16 +163,18 @@ import Toasted from 'vue-toasted';
         that.socket.on('raisehand', function (info) {
           if (raisedHands.hasOwnProperty(info.user.identity)) return
           raisedHands[info.user.identity] = 1
-          Vue.toasted.info(info.user.firstName + ' raised a request!', { position: 'bottom-right',
+          let msg=info.user.firstName + ' raised a request!';
+          that.notifications.push({text: msg,time: new Date()})
+          Vue.toasted.info(msg, { position: 'bottom-right',
             action: [
-              {
+              /*{
                 text: 'Chat',
                 onClick: (e, toast) => {
                   delete raisedHands[info.user.identity]
                   that.$refs.chatBox.chatWith(info.user.identity)
                   toast.goAway(0)
                 }
-              },
+              },*/
               {
                 text: 'Close',
                 onClick: (e, toast) => {
@@ -175,35 +188,64 @@ import Toasted from 'vue-toasted';
           addParticipants(peers, true)
           that.totalParticipants = Object.keys(that.participants).length
         })
+        that.socket.on('allparticipants',function (allParticipants){
+          Object.keys(allParticipants).forEach(function (peerId) {
+            allParticipants[peerId].peerId = peerId
+            that.allParticipants[allParticipants[peerId].identity] = allParticipants[peerId]
+          })
+        })
         that.socket.on('breakouts', function (breakouts) {
           that.breakouts = breakouts;
         })
         that.socket.on('peer-connect', function (data) {
           data.user.peerId = data.socketId
+          that.notifications.push({text: data.user.firstName + ' is online!',time: new Date()});
           addParticipants(data.user, false)
+          that.allParticipants[data.user.identity]=data.user;
           that.totalParticipants = Object.keys(that.participants).length
           if (data.user.presenter === true) {
             Vue.toasted.success('Presenter is online!', { position: 'bottom-right' }).goAway(1000)
             that.presenter = data.user
           }
+          that.manageBreakout();
+        })
+        that.socket.on('peer-connect-global', function (data) {
+          if(that.loggedInUser.presenter){
+            that.allParticipants[data.user.identity]=data.user;
+          }
         })
         that.socket.on('disconnect', function () {
           that.participants = {}
+          that.allParticipants={};
           that.totalParticipants = 0
         })
         that.socket.on('changepermission', function(action, value){
           that.loggedInUser.permissions[action]=value;
         })
-        that.socket.on('peer-disconnect', function (data) {
+        that.socket.on('peer-disconnect-global', function (data) {
           let peerIdentity
-          Object.keys(that.participants).forEach(identity => {
-            if (that.participants[identity].peerId === data.socketId) {
+          Object.keys(that.allParticipants).forEach(identity => {
+            if (that.allParticipants[identity].peerId === data.socketId) {
               peerIdentity = identity
             }
           })
           if (peerIdentity) {
-            delete that.participants[peerIdentity]
+            delete that.allParticipants[peerIdentity];
           }
+        });
+        that.socket.on('peer-disconnect', function (data) {
+          let peerIdentity
+          Object.keys(that.allParticipants).forEach(identity => {
+            if (that.allParticipants[identity].peerId === data.socketId) {
+              peerIdentity = identity
+            }
+          })
+          if (peerIdentity) {
+            that.notifications.push({text: that.participants[peerIdentity].firstName + ' is offline!',time: new Date()});
+            delete that.participants[peerIdentity]
+            delete that.allParticipants[peerIdentity];
+          }
+
           that.participants=Object.assign({},that.participants);
           that.remaining_participants=Object.assign({},that.participants);
           if(that.breakout.participants.length){
@@ -303,6 +345,9 @@ import Toasted from 'vue-toasted';
         this.currentTab=null;
         this.socket.emit('clearworkspace');
       },
+      clearNotifications: function(){
+        this.notifications=[];
+      },
       changeContentPage: function (pageNum) {
         this.isLoadingContent = true
         this.currentContentPage = pageNum
@@ -340,7 +385,10 @@ import Toasted from 'vue-toasted';
           this.showTimer=false
         }
         if (!document.querySelector('.notification-container').contains(ev.target)) {
-          this.showNotification = false
+          this.showNotifications = false
+        }
+        if (!document.querySelector('.participant-container').contains(ev.target)) {
+          this.showParticipants = false
         }
         if (!document.querySelector('#play-menu .dropdown').contains(ev.target)) {
           this.toggleMenu(true)
@@ -392,13 +440,67 @@ import Toasted from 'vue-toasted';
                  y + ' z'
         return anim
       },
-      createBreakout: function () {
-        let that =this;
-        //that.isBreakoutActive=true;
-        that.breakouts.push(that.breakout);
-        that.breakout={participants: [],groupLeader: null,timeOut: 60,startTime: new Date().getTime()};
-        that.socket.emit('createbreakout',that.breakouts);
+      showParticipantList: function (index){
+        this.participantList.push(index);
       },
+      hideParticipantList: function (index){
+        let currentIndex=this.participantList.indexOf(index);
+        this.participantList.splice(currentIndex,1);
+      },
+      addParticipants: function (index) {
+        let that=this;
+        that.selectedParticipants.forEach(function(participant,participantIndex){
+          if(participantIndex==0 && that.breakouts[index].participants.length ==0) that.breakouts[index].groupLeader=participant;
+          that.breakouts[index].participants.push(participant);
+          delete that.remaining_participants[participant];
+          that.socket.emit('addparticipant',index, participant, that.allParticipants[participant].peerId);
+        });
+        that.manageBreakout();
+        that.toggleModel('participants');
+        that.toggleModel('breakout');
+      }, 
+      addParticipantToBreakout: function (index) {
+        let that=this;
+        that.selectedParticipants=[];
+        that.addBreakoutIndex=index;
+        that.breakout=Object.assign({},that.breakouts[index]);
+        that.toggleModel('participants');
+        that.toggleModel('breakout');
+      },
+      confirmParticipantRemove: function (index, identity) {
+        let that=this;
+        that.participantToRemove={'index': index,'identity': identity};
+        that.toggleModel('confirmbox-participant');
+      },
+      removeParticipant: function (index, identity) {
+        let that=this;
+        let breakout=that.breakouts[index];
+        let userIndex=breakout.participants.indexOf(identity);
+        breakout.participants.splice(userIndex,1);
+        if(breakout.groupLeader == identity){
+          breakout.groupLeader=null;
+          if(breakout.participants.length) breakout.groupLeader=breakout.participants[0];
+        }
+        that.remaining_participants[identity]=Object.assign({},that.participants[identity]);
+        that.breakouts[index]=breakout;
+        that.manageBreakout();
+        that.socket.emit('delparticipant',index, identity, that.allParticipants[identity].peerId);
+      },
+      createBreakout: function (){
+        let that = this;
+        that.breakouts.push({name: that.breakoutName,participants: [],groupLeader: null,timeOut: 60,startTime: new Date().getTime()});
+        that.socket.emit('createbreakout',that.breakouts);
+        that.manageBreakout();
+        that.toggleModel('createbreakout');
+        that.toggleModel('breakout');
+      },
+      // createBreakout: function () {
+      //   let that =this;
+      //   //that.isBreakoutActive=true;
+      //   that.breakouts.push(that.breakout);
+      //   that.breakout={participants: [],groupLeader: null,timeOut: 60,startTime: new Date().getTime()};
+      //   that.socket.emit('createbreakout',that.breakouts);
+      // },
       changeRoom: function (identity, room) {
         let that=this;
         if(room==0){
@@ -414,20 +516,46 @@ import Toasted from 'vue-toasted';
             that.breakout.groupLeader=identity;
             that.breakout.timeOut=60;
           }
-          that.breakout.participants.push(identity);
+          that.breakout.participants.push(iidentitydentity);
           if(that.remaining_participants[identity]) delete that.remaining_participants[identity];
         }
       },
-      enterRoom: function (index) {
-        this.socket.emit('enterroom',index);
+      enterRoom: function (event) {
+        let value=event.target.value;
+        event.target.value='-1';
+        if(value=='create'){
+          this.toggleModel('createbreakout');
+          return;
+        }
+        this.socket.emit('enterroom',value);
       },
-      endBreakout: function (index) {
-        this.socket.emit('endbreakout',index);
-        window.location.reload();
+      changeTimeout: function (index,breakout){
+        let that=this;
+        that.socket.emit('createbreakout',that.breakouts);
+      },
+      endBreakout: function () {
+        let that=this;
+        this.selectedBreakouts.forEach(function(index){
+          that.socket.emit('endbreakout',index);
+        })
+        setTimeout(function(){
+          window.location.reload();
+        },200);
+      },
+      endAllBreakout: function () {
+        let that=this;
+        this.breakouts.forEach(function(breakout,index){
+          that.socket.emit('endbreakout',index);
+        });
+        setTimeout(function(){
+          window.location.reload();
+        },200);
       },
       exitBreakout: function(index){
         this.socket.emit('exitbreakout',index);
-        window.location.reload();
+        setTimeout(function(){
+          window.location.reload();
+        },200);
       },
       manageBreakout: function () {
         let that=this
@@ -438,7 +566,6 @@ import Toasted from 'vue-toasted';
             if(that.remaining_participants[identity]) delete that.remaining_participants[identity];
           });
         });
-        that.toggleModel('breakout');
       },
       toggleVideo: function () {
         this.isVidAvailable = !this.isVidAvailable
@@ -457,6 +584,17 @@ import Toasted from 'vue-toasted';
       },
       stopScreenShare: function () {
         this.isScreenShared = false
+      },
+      toggleBox: function (box) {
+        switch(box){
+          case 'chat':
+            this.showChatBox=!this.showChatBox;
+          break;
+          case 'webcam':
+            this.showWebCamBox=!this.showWebCamBox;
+          break;
+        }
+        this.handleResize();
       },
       toggleScreen: function () {
         this.isScreenShared = !this.isScreenShared
@@ -488,17 +626,20 @@ import Toasted from 'vue-toasted';
             break
           }
         }
+        this.handleResize();
         if (!triggeredByEvent) this.socket.emit('tabremove', tabId)
         if (e) e.stopPropagation()
       },
       handleResize: function (firstTime) {
         this.$nextTick(function () {
+          // right-sidebar margin
+          document.querySelector('.right-sidebar').style="margin-top: "+(document.getElementById('play-menu').clientHeight) +"px";
           // Remaining playground height= (Window - NavBar - Navbar bottom Margin - Playground bottom margin)
           let heightToPlay = window.innerHeight - document.querySelector('.header-bar').clientHeight - 16 - 16
-          // Remaining ChatList height= (Playground - Playground margin - Playground padding - Playground border - Video - ChatBox margin - Chatbox heading - Chat Input)
-          let heightToChat = heightToPlay - 16 - 32 - 1 - document.querySelector('.chat-bar').clientHeight - document.getElementById('video-container').clientHeight - 16 - 33 - document.querySelector('.chat-input').clientHeight
-          // minHeight=video + top margin + padding + heading + heading margin + bottom margin + minHeight for chatlist
-          let minHeight = document.getElementById('video-container').clientHeight + 16 + 32 + 33 + 8 + 10 + 128 + document.querySelector('.chat-bar').clientHeight + document.querySelector('.chat-input').clientHeight
+          // Remaining ChatList height= (Playground - Playground margin - Playground padding - Playground border - Video - ChatBox margin - Chatbox heading - Chat Input - PlayMenu Height - Margin Top Right Sidebar - Margin Bottom Video Box - Video Box Header)
+          let heightToChat = heightToPlay - 16 - 32 - 1 - /*document.querySelector('.chat-bar').clientHeight -*/ document.getElementById('video-container').clientHeight - 16 - 33 - document.querySelector('.chat-input').clientHeight - document.getElementById('play-menu').clientHeight - 16 - 16 - 49
+          // minHeight=video + top margin + padding + heading + heading margin + bottom margin + Play Menu Height +  Margin Top Right Sidebar + Margin Bottom Video Box + Video Box Header +  minHeight for chatlist
+          let minHeight = document.getElementById('video-container').clientHeight + 16 + 32 + 33 + 8 + 10 + document.getElementById('play-menu').clientHeight + 16 + 16 + 49 +128 + /*document.querySelector('.chat-bar').clientHeight +*/ document.querySelector('.chat-input').clientHeight
 
           if (heightToPlay < minHeight) heightToPlay = minHeight
           document.querySelector('.playground').style = (window.innerWidth <= 768 ? '' : 'height: ' + heightToPlay + 'px;') + ' min-height: ' + minHeight + 'px'
@@ -729,6 +870,11 @@ import Toasted from 'vue-toasted';
         return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
           (c ^ cryptoObj.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
         )
+      }
+    },
+    computed: {
+      orderedNotifications: function(){
+        return Object.assign([],this.notifications).reverse();
       }
     },
     watch: {

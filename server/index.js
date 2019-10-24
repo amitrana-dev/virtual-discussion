@@ -42,6 +42,7 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
     let loggedInUser=null
     let myBreakout;
     let myBreakoutIndex;
+    let allBreakouts=[];
     if (CONFIG.DEBUG) { console.log(userToken + ' connected on socket ' + socket.id) }
     
     Promise.all([DISCUSSION.getInfo(discussionId,REDIS),USER.getUserInfoForDiscussion(userToken,discussionId)])
@@ -58,6 +59,7 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
             return;
           }
           breakouts=JSON.parse(breakouts);
+          allBreakouts=Object.assign([],breakouts);
           let isAnyChange=false;
           let existDiscussionId=discussionId;
           breakouts = breakouts.filter(function(breakout, index){
@@ -90,31 +92,59 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
       socket.on('message', function (data,peerId) {
           socket.broadcast.to(peerId).emit('message', data,socket.id);
       });
+      socket.on('addparticipant', function (index, identity, socketId){
+        REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
+          if(!breakouts){
+            return;
+          }
+          breakouts=JSON.parse(breakouts);
+          if(breakouts[index].participants.length == 0) breakouts[index].groupLeader=identity;
+          breakouts[index].participants.push(identity);
+          REDIS.hset('breakouts', originalDiscussionId, JSON.stringify(breakouts) ,_=>{});
+          socket.broadcast.to(socketId).emit('reconnect');  
+        });
+      });
+      socket.on('delparticipant', function (index, identity, socketId){
+        REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
+          if(!breakouts){
+            return;
+          }
+          breakouts=JSON.parse(breakouts);
+          if(breakouts[index].groupLeader == identity) breakouts[index].groupLeader= breakouts[index].participants.length ? breakouts[index].participants[0] : null;
+          breakouts[index].participants.splice(breakouts[index].participants.indexOf(identity),1);
+          console.log('deleting ',identity);
+          console.log(breakouts[index].participants);
+          REDIS.hset('breakouts', originalDiscussionId, JSON.stringify(breakouts) ,_=>{})  
+          socket.broadcast.to(socketId).emit('reconnect');  
+        });
+      });
       socket.on('createbreakout', function (breakouts) {
         REDIS.hset('breakouts', discussionId, JSON.stringify(breakouts) ,_=>{})  
         //REDIS.hset('isBreakoutActive', discussionId, true ,_=>{});
-        socket.to(discussionId).emit('reconnect');
+        // socket.to(originalDiscussionId).emit('reconnect');
+        // allBreakouts.forEach(function(_,index){
+        //   socket.to(discussionId + '-'+index.toString()).emit('reconnect');
+        // });
         //socket.emit('reconnect');
       });
 
       socket.on('enterroom', function (index) {
         if(!user.presenter) return;
-        REDIS.hget('breakouts', discussionId, (err,breakouts)=>{
+        REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
           breakouts=JSON.parse(breakouts);
           // Get back to common room
-          if(index == -1){
-            breakouts = breakouts.map(function(breakout){
-              let indexOfUser=breakout.participants.indexOf(user.identity);
-              if(indexOfUser !== -1){
-                breakout.participants.splice(indexOfUser);
-              }
-              return breakout;
-            });
-          }else{
-            // enter a specific room
-            breakouts[index].participants.push(user.identity);
-          }
-          REDIS.hset('breakouts', discussionId, JSON.stringify(breakouts) ,_=>{})    
+          breakouts = breakouts.map(function(breakout){
+            let indexOfUser=breakout.participants.indexOf(user.identity);
+            if(indexOfUser !== -1){
+              breakout.participants.splice(indexOfUser);
+            }
+            if(index != -1){
+              // enter a specific room
+              breakout.participants.push(user.identity);
+            }
+            return breakout;
+          });
+          REDIS.hset('breakouts', originalDiscussionId, JSON.stringify(breakouts) ,_=>{})    
           socket.emit('reconnect');
         });
       });
@@ -130,7 +160,6 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
       });
       socket.on('endbreakout', function (index) {
         if(!user.presenter) return;
-        
         REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
           breakouts=JSON.parse(breakouts);
           breakouts.splice(index, 1);
@@ -155,7 +184,9 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
         })
       }) 
       // send info about connected peers
+      console.log('connected to ',discussionId, originalDiscussionId);
       socket.to(discussionId).emit('peer-connect',{socketId: socket.id,user: user});
+      socket.to(originalDiscussionId).emit('peer-connect-global',{socketId: socket.id,user: user});
       IO.in(discussionId).clients(function(err,clients){
         if(clients) clients=clients.filter(socketId=> socketId !== socket.id)
         socket.emit('connected',clients);
@@ -219,8 +250,32 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
                 participants = JSON.parse(participants)
               }
               if (!participants[discussionId]) participants[discussionId] = {}
+              
               participants[discussionId][socket.id] = user
               socket.emit('participants',participants[discussionId]);
+
+
+              let overAllParticipants=Object.assign({},participants[discussionId]);
+              // Send all participants irrerespective of breakout rooms for presenter
+              if(user.presenter){
+                overAllParticipants=Object.assign({},participants[originalDiscussionId]);
+                allBreakouts.forEach(function(breakout,index){
+                  let currentDiscussionId=originalDiscussionId+'-'+index.toString();
+                  let socketByIdentity={}
+                  if(participants[currentDiscussionId]){
+                    Object.values(participants[currentDiscussionId]).forEach(function(participant){
+                      socketByIdentity[participant.identity]=participant.peerId;
+                    })
+                  }
+                  breakout.participants.forEach(function(identity){
+                    if( participants[currentDiscussionId] && socketByIdentity[identity] ){
+                      overAllParticipants[socketByIdentity[identity]]=participants[currentDiscussionId][socketByIdentity[identity]];
+                    }
+                  })
+                });
+              }
+              socket.emit('allparticipants',overAllParticipants);
+              
               REDIS.set('participants', JSON.stringify(participants), (err, res) => {
                 if (err && CONFIG.DEBUG) console.warn(err)
                 resolve(participants[discussionId])
@@ -251,8 +306,10 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
 
     // remove peer from discussion and participants on disconnect
     socket.on('disconnect', () => {
-      console.log(socket.id + ' is disconnected')
+      console.log(socket.id + ' is disconnected',discussionId,originalDiscussionId)
       socket.to(discussionId).emit('peer-disconnect',{socketId: socket.id});
+      socket.to(originalDiscussionId).emit('peer-disconnect',{socketId: socket.id});
+      socket.to(originalDiscussionId).emit('peer-disconnect-global',{socketId: socket.id});
       return new Promise((resolve, reject) => {
         REDIS.get('mapSocketToDiscussion', (err, mapSocketToDiscussion) => {
           if (err && CONFIG.DEBUG) console.warn(err)
@@ -278,6 +335,9 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
             }
             if (!participants[discussionId]) participants[discussionId] = {}
             delete participants[discussionId][socket.id]
+            if(discussionId != originalDiscussionId && participants[originalDiscussionId]){
+              delete participants[originalDiscussionId][socket.id]
+            }
             REDIS.set('participants', JSON.stringify(participants))
           })
           REDIS.hget('workplace',discussionId, (err, workplace) => {

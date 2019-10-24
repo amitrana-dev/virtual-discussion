@@ -1,6 +1,6 @@
 var messageList = require('vue').component('message-list', require('./message-list'))
 module.exports={
-    props: ['socket', 'loggedInUser', 'participants'],
+    props: ['socket', 'loggedInUser', 'participants','showChatBox','showWebCamBox'],
     data: function () {
       return {
         chatMessage: '',
@@ -76,6 +76,16 @@ module.exports={
       }
     },
     watch: {
+      showChatBox: function(val){
+        if(val){
+          this.scrollToBottom();
+        }
+      },
+      showWebCamBox: function(val){
+        if(this.showChatBox){
+          this.scrollToBottom();
+        }
+      },
       socket: function () {
         var that = this
         that.socket.on('reconnect', function(){

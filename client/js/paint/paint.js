@@ -6389,7 +6389,6 @@ module.exports=(...args)=>{
 
 		Paint.prototype.keydown = function keydown (event) {
 			var key = event.keyCode || event.which;
-
 			if (event.target == document.body) {
 				this.keyMap[key] = true;		
 				
@@ -6407,7 +6406,7 @@ module.exports=(...args)=>{
 					this.setVerticalMirror(false);
 				}
 
-				if (this.current_tool !== "grab" || this.previous_tool == undefined && key == 32) {
+				if (this.current_tool !== "grab" && this.current_tool !== "select" || this.previous_tool == undefined && key == 32) {
 					this.previous_tool = this.current_tool;
 					this.changeTool("grab");
 				}
@@ -6427,7 +6426,6 @@ module.exports=(...args)=>{
 
 		Paint.prototype.keyup = function keyup (event) {
 			var key = event.keyCode || event.which;
-
 			if (event.target == document.body) {
 				this.keyMap[key] = null;
 				
@@ -6444,6 +6442,9 @@ module.exports=(...args)=>{
 				}
 				if (this.current_tool == "picker" && key == 18 && this.previous_tool) {
 					this.changeTool(this.previous_tool);
+				}
+				if (this.current_tool == "select" && key == 46 && this.selectedDrawingIndex) {
+					this.removeDrawing(this.selectedDrawingIndex);
 				}
 			}
 		};
@@ -6962,6 +6963,13 @@ module.exports=(...args)=>{
 				context.closePath();
 		  }
 		};
+		Paint.prototype.removeDrawing = function removeDrawing (selectedIndex){
+			if(this.localDrawings[selectedIndex]){
+				this.localDrawings.splice(selectedIndex,1);
+				this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
+				this.redrawLocals();
+			}
+		};
 		Paint.prototype.addDrawing = function addDrawing (drawing) {
 			this.localDrawings.push(drawing);
 			drawing.color=tinycolor(drawing.color);
@@ -7161,6 +7169,7 @@ module.exports=(...args)=>{
 		Paint.prototype.changeTool = function changeTool (tool) {
 			this.exectool("remove");
 			this.current_tool = tool;
+			delete this.selectedDrawingIndex;
 			this.trianglePoints=null;
 			this.effectsCanvas.style.opacity=1;
 			if(this.clearHighlightTimer) clearTimeout(this.clearHighlightTimer);
@@ -7262,6 +7271,15 @@ module.exports=(...args)=>{
 				elemClass: "tool-item tool-grab",
 				title: "Change tool to grab",
 				value: "grab",
+				action: this.changeTool.bind(this)
+			}, {
+				name: "select",
+				type: "button",
+				html: "i",
+				place: "left",
+				elemClass: "tool-item tool-grab",
+				title: "Change tool to select shape",
+				value: "select",
 				action: this.changeTool.bind(this)
 			}, {
 				name: "line",
@@ -7682,7 +7700,7 @@ module.exports=(...args)=>{
 					paint.lastTargetZoomPoint = targetCoords; 
 				}	
 			},
-			select: function select (paint, event) {
+			/*select: function select (paint, event) {
 				if (event == "remove") {
 					delete paint.lastSelectPoint;
 					paint.effectsCanvas.style.cursor = "";
@@ -7751,7 +7769,7 @@ module.exports=(...args)=>{
 					context.strokeStyle = "darkgray";
 					context.stroke();
 				}	
-			},
+			},*/
 			grab: function grab (paint, event) {
 				// Tool canceled or deselected
 				if (event == "remove" || event.type == "mouseup" || event.type == "touchend" || event.type === 'mouseleave') {
@@ -7783,6 +7801,154 @@ module.exports=(...args)=>{
 
 					// Update last grab position
 					paint.lastGrabCoords = scaledCoords;
+				}		
+			},
+			select: function select (paint, event) {
+				// Tool canceled or deselected
+				if (event == "remove" || event.type == "mouseup" || event.type == "touchend" || event.type === 'mouseleave') {
+					delete paint.lastSelectCoords;
+					paint.isDragging=false;
+					paint.effectsCanvas.style.cursor = "";
+					delete paint.lastClickedAt;
+					return;
+				}
+
+				// Get the coordinates relative to the canvas
+				var targetCoords = paint.getCoords(event);
+				var scaledCoords = paint.scaledCoords(targetCoords, event);
+
+				// First time we grab?
+				if (!paint.lastSelectCoords) {
+					// If this is just a mousemove we are just moving
+					// our mouse without holding the button down
+					if (event.type == "mousedown" || event.type == "touchstart") {
+						if(!paint.lastClickedAt) paint.lastClickedAt=new Date();
+						let doubleClick=( (new Date() - paint.lastClickedAt) < 300 );
+						paint.lastClickedAt=new Date();
+						if(doubleClick){
+							paint.isDragging=true;
+						}
+						paint.lastSelectCoords = scaledCoords;
+						let scaledLastSelectCoords = Object.assign([],paint.lastSelectCoords);
+						scaledLastSelectCoords[0]=Math.round((paint.local.leftTopX + (scaledLastSelectCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION;
+						scaledLastSelectCoords[1]=Math.round((paint.local.leftTopY + (scaledLastSelectCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION;
+						
+						paint.effectsCanvas.style.cursor = "move";
+						var keepSearching=true;
+						var rectanglePoints=[];
+						var drawing={},scaledDrawing={};
+						for(var i=paint.localDrawings.length; i >0 ; i--){
+							delete paint.selectedDrawingIndex;
+							drawing=Object.assign({},paint.localDrawings[i-1]);
+							scaledDrawing=Object.assign({},paint.localDrawings[i-1]);
+							scaledDrawing.x=Math.round(((scaledDrawing.x - paint.local.leftTopX) * paint.local.zoom) * paint.PATH_PRECISION)/ paint.PATH_PRECISION;
+							scaledDrawing.x1=Math.round(((scaledDrawing.x1 - paint.local.leftTopX) * paint.local.zoom) * paint.PATH_PRECISION)/ paint.PATH_PRECISION;
+							scaledDrawing.y=Math.round(((scaledDrawing.y - paint.local.leftTopY) * paint.local.zoom) * paint.PATH_PRECISION)/ paint.PATH_PRECISION;
+							scaledDrawing.y1=Math.round(((scaledDrawing.y1 - paint.local.leftTopY) * paint.local.zoom) * paint.PATH_PRECISION)/ paint.PATH_PRECISION;
+							switch(paint.localDrawings[i-1].type){
+								case 'circle':
+									let circleRadius=Math.max(Math.abs(drawing.x - drawing.x1),Math.abs(drawing.y - drawing.y1));
+									let scaledCircleRadius=Math.max(Math.abs(scaledDrawing.x - scaledDrawing.x1),Math.abs(scaledDrawing.y - scaledDrawing.y1));
+									var distancesquared = (scaledLastSelectCoords[0] - drawing.x1) * (scaledLastSelectCoords[0] - drawing.x1) + (scaledLastSelectCoords[1] - drawing.y1) * (scaledLastSelectCoords[1] - drawing.y1);
+  								if(distancesquared <= circleRadius * circleRadius){
+  									console.log('Inside circle');
+										paint.selectedDrawingIndex=i-1;
+  									keepSearching=false;
+  									rectanglePoints=[
+  										[scaledDrawing.x1 - scaledCircleRadius - 5, scaledDrawing.y1 + scaledCircleRadius + 5],
+											[scaledDrawing.x1 + scaledCircleRadius + 5, scaledDrawing.y1 + scaledCircleRadius + 5],
+											[scaledDrawing.x1 + scaledCircleRadius + 5, scaledDrawing.y1 - scaledCircleRadius - 5],
+											[scaledDrawing.x1 - scaledCircleRadius - 5, scaledDrawing.y1 - scaledCircleRadius - 5]
+  									]
+  								}
+								break;
+								case 'rhombus':
+									var diffX=Math.abs(drawing.x1 - drawing.x);
+									if(drawing.x <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= drawing.x + diffX && drawing.y - diffX <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= drawing.y){
+										console.log('Inside rhombus');
+										paint.selectedDrawingIndex=i-1;
+  									keepSearching=false;
+  									rectanglePoints=[
+  										[scaledDrawing.x - 5, scaledDrawing.y + 5],
+											[scaledDrawing.x1 + 5, scaledDrawing.y + 5],
+											[scaledDrawing.x1 + 5, scaledDrawing.y - (scaledDrawing.x1 - scaledDrawing.x) - 5],
+											[scaledDrawing.x - 5, scaledDrawing.y - (scaledDrawing.x1 - scaledDrawing.x) - 5]
+  									]
+									}
+								break;
+								case 'triangle':
+									var point=[scaledLastSelectCoords[0],scaledLastSelectCoords[1]],
+									triangle=[
+										[drawing.x, drawing.y],
+										[drawing.x1, drawing.y],
+										[( drawing.x1 + drawing.x )/2 , drawing.y - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )]
+									],
+					     		cx = point[0], cy = point[1],
+					        t0 = triangle[0], t1 = triangle[1], t2 = triangle[2],
+					        v0x = t2[0]-t0[0], v0y = t2[1]-t0[1],
+					        v1x = t1[0]-t0[0], v1y = t1[1]-t0[1],
+					        v2x = cx-t0[0], v2y = cy-t0[1],
+					        dot00 = v0x*v0x + v0y*v0y,
+					        dot01 = v0x*v1x + v0y*v1y,
+					        dot02 = v0x*v2x + v0y*v2y,
+					        dot11 = v1x*v1x + v1y*v1y,
+					        dot12 = v1x*v2x + v1y*v2y;
+					        // credit: https://github.com/mattdesl/point-in-triangle
+							    // Compute barycentric coordinates
+							    var b = (dot00 * dot11 - dot01 * dot01),
+							        inv = b === 0 ? 0 : (1 / b),
+							        u = (dot11*dot02 - dot01*dot12) * inv,
+							        v = (dot00*dot12 - dot01*dot02) * inv
+							    if(u>=0 && v>=0 && (u+v < 1)){
+							    	console.log('inside triangle');
+							    	paint.selectedDrawingIndex=i-1;
+  									keepSearching=false;
+  									rectanglePoints=[
+  										[scaledDrawing.x - 5, scaledDrawing.y + 5],
+											[scaledDrawing.x1 + 5, scaledDrawing.y + 5],
+											[scaledDrawing.x1 + 5,scaledDrawing.y - ((scaledDrawing.x1 - scaledDrawing.x) * (Math.sqrt(3)/2) ) - 5],
+											[scaledDrawing.x - 5,scaledDrawing.y - ((scaledDrawing.x1 - scaledDrawing.x) * (Math.sqrt(3)/2) ) - 5]
+  									]
+							    }
+								break;
+							}
+							if(!keepSearching) break;
+						}
+						if(typeof paint.selectedDrawingIndex !== 'undefined'){
+							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+							var context = paint.effectsCanvasCtx;
+							context.save();
+							context.globalCompositeOperation="destination-over";
+							context.setLineDash([5, 3]);
+							context.beginPath();
+							context.moveTo(rectanglePoints[0][0],rectanglePoints[0][1]);
+							context.lineTo(rectanglePoints[1][0],rectanglePoints[1][1]);
+							context.lineTo(rectanglePoints[2][0],rectanglePoints[2][1]);
+							context.lineTo(rectanglePoints[3][0],rectanglePoints[3][1]);
+							context.lineTo(rectanglePoints[0][0],rectanglePoints[0][1]);
+							context.strokeStyle = '#6d6d6d'; /* gray */
+							context.lineWidth = 1 *  paint.local.zoom;
+							context.stroke();
+							context.closePath();
+							context.restore();
+						}
+					}
+				}
+
+				if ((event.type == "mousemove" || event.type == "touchmove") && typeof paint.selectedDrawingIndex != 'undefined' && paint.isDragging) {
+					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
+					console.log(paint.lastSelectCoords,scaledCoords);
+					// How much should the drawings be moved
+					var relativeMotionX = paint.lastSelectCoords[0] - scaledCoords[0],
+					    relativeMotionY = paint.lastSelectCoords[1] - scaledCoords[1];
+					console.log(event.type,relativeMotionX,relativeMotionY);
+					paint.localDrawings[paint.selectedDrawingIndex].x=paint.localDrawings[paint.selectedDrawingIndex].x-relativeMotionX;
+					paint.localDrawings[paint.selectedDrawingIndex].x1=paint.localDrawings[paint.selectedDrawingIndex].x1-relativeMotionX;
+					paint.localDrawings[paint.selectedDrawingIndex].y=paint.localDrawings[paint.selectedDrawingIndex].y-relativeMotionY;
+					paint.localDrawings[paint.selectedDrawingIndex].y1=paint.localDrawings[paint.selectedDrawingIndex].y1-relativeMotionY;
+					// Update last drag position
+					paint.lastSelectCoords = scaledCoords;
+					paint.redrawLocals();
 				}		
 			},
 			line: function line (paint, event) {
