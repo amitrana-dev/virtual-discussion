@@ -8064,7 +8064,7 @@ module.exports=(...args)=>{
 									maxScaledY=Math.max(scaledDrawing.y1,scaledDrawing.y);
 									
 									diffX=Math.abs(drawing.x1 - drawing.x);
-									if(minX <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= maxX && minY <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= maxY){
+									if(minX - 10 <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= maxX + 10 && minY - 10 <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= maxY + 10){
 										paint.selectedDrawingIndex=i-1;
   									keepSearching=false;
   									paint.rectanglePoints=[
@@ -8087,7 +8087,7 @@ module.exports=(...args)=>{
 									maxScaledY=Math.max(scaledDrawing.y1,scaledDrawing.y);
 									
 									diffX=Math.abs(drawing.x1 - drawing.x);
-									if(minX <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= maxX && minY <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= maxY){
+									if(minX - 10 <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= maxX + 10 && minY -10 <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= maxY + 10){
 										paint.selectedDrawingIndex=i-1;
   									keepSearching=false;
   									paint.rectanglePoints=[
