@@ -21,24 +21,24 @@
     </style>
   </head>
   <body>
-    <div id="discussion_board" class="container-fluid">
+    <div id="discussion_board" class="container-fluid" :class="{'conference-view': (layout == 'conference-view'),'classroom-view': (layout == 'classroom-view')}">
        <div id="equationToolbar" style="display: none;"></div>
        <header class=" header-bar">
-        <div class="header-cont d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm nav-bar">
-          <h5 class="my-0 col-md-6  font-weight-normal"><img src="img/logo.png" class="mr-3" />Virtual Discussion on {{course.title}}</h5>
-          <nav>
-            <span>
-              Remaining hrs<br>
+        <div class="header-cont d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-0 bg-white border-bottom shadow-sm nav-bar">
+          <h5 class="my-0 col-md-6 course-title"><img src="img/logo.png" class="mr-3" />Virtual Discussion on {{course.title}}</h5>
+          <span>
+              <span class="remaininghors">Remaining hrs</span><br>
               <span class="remaining-time">
                 <span class="remaining-hours">{{remainingDuration.hours < 10 ? '0'+remainingDuration.hours : remainingDuration.hours}}</span>:<span class="remaining-mins">{{remainingDuration.minutes < 10 ? '0'+remainingDuration.minutes : remainingDuration.minutes}}</span>:<span class="remaining-secs">{{remainingDuration.seconds < 10 ? '0'+remainingDuration.seconds : remainingDuration.seconds}}</span>
               </span>
-            </span>
+           </span>
+          <nav>
             <a  v-if="loggedInUser && loggedInUser.presenter  &&  !currentBreakout" class="p-2 text-dark fa" href="javascript:void(0)" title="Record Session" id="toggleRecording" @click="toggleRecording"><i class="fa fa-circle" :class="{'active-rec': isRecordingAvailable}"></i> [REC{{isRecordingAvailable ? ' ON' : ''}}]</a>
             <div class="dropdowns-wrapper">
               <div class="dropdown-container notification-container">
                 <div class="notifications dropdown dd-trigger" @click="showNotifications=!showNotifications">
                   <span class="count animated">{{notifications.length}}</span>
-                  <span class="fa fa-bell"></span> 
+                  <span class="fa fa-bell text-greenish"></span> 
                 </div>
                 <div class="dropdown-menu animated p-0" :class="{'fadeOutUp': !showNotifications,'fadeInDown': showNotifications,'d-block': showNotifications}">
                   <div class="dropdown-header">
@@ -50,7 +50,7 @@
                   <div class="dropdown-body">
                     <div class="notification new" v-for="notification in orderedNotifications">
                       <div class="notification-text">
-                         <span class="highlight">{{notification.text}}</span>
+                         <span class="highlight"><span class="notification-person">{{notification.sender}}</span> <span class="notification-msg">{{notification.text}}</span></span>
                          <br>
                       </div>
                     </div>
@@ -59,45 +59,27 @@
               </div>
             </div>
           </nav>
-          <nav class="my-2 my-md-0 mr-md-5 mr-md-auto" id="media-controls">
+          <!--<nav class="my-2 my-md-0 mr-md-5 mr-md-auto" id="media-controls">
             <a  v-if="loggedInUser && loggedInUser.presenter  && currentBreakout" class="p-2 text-dark fa mr-3" href="javascript:void(0)" title="Exit to common room" @click="exitBreakout(breakoutIndex)"><i class="fas fa-sign-out-alt"></i></a>
-          </nav>
-          <nav class="my-0 my-md-0 mr-md-3">
-            <div class="dropdowns-wrapper">
-              <div class="dropdown-container timer-container">
-                <div class="notifications dropdown dd-trigger" title="Time Record" @click="showTimer=!showTimer">
-                  <svg class="nav-time-record" width="25" height="25" viewbox="0 0 250 250">
-                    <circle cx="125" cy="125" r="120" stroke="black" stroke-width="2" fill="none" />
-                    <path :d="drawRemainingTime()" stroke="black" transform="translate(125, 125) scale(.84)"/>
-                  </svg>
-                </div>
-                <div class="dropdown-menu animated p-0" :class="{'fadeOutUp': !showTimer,'fadeInDown': showTimer,'d-block': showTimer}">
-                  <div class="dropdown-header">
-                    <span class="triangle"></span>
-                    <span class="heading">Remaining Time</span>
-                  </div>
-                  <div class="dropdown-body text-center font-weight-bold fa-3x">
-                    <span class="remaining-hours">{{remainingDuration.hours < 10 ? '0'+remainingDuration.hours : remainingDuration.hours}}</span>:<span class="remaining-mins">{{remainingDuration.minutes < 10 ? '0'+remainingDuration.minutes : remainingDuration.minutes}}</span>:<span class="remaining-secs">{{remainingDuration.seconds < 10 ? '0'+remainingDuration.seconds : remainingDuration.seconds}}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <a v-if="loggedInUser && loggedInUser.presenter && !currentBreakout" class="p-2 text-dark fa" href="javascript:void(0)" @click="manageBreakout();toggleModel('breakout')" title="Manage Breakout Room"><i class="fa fa-columns"></i></a>
+          </nav>-->
+          <nav class="my-0 my-md-0 mr-md-3 ml-md-auto">
+           
+            <a v-if="loggedInUser && loggedInUser.presenter && !currentBreakout" class="p-2 text-greenish fa" href="javascript:void(0)" @click="manageBreakout();toggleModel('breakout')" title="Manage Breakout Room"><i class="fa fa-columns"></i></a>
             
-            <a class="p-2 text-dark fa" v-if="loggedInUser && !loggedInUser.presenter  && presenter" href="javascript:void(0)" title="Raise Hand" @click="raiseHand()"><i class="fa fa-hand-paper"></i></a>
+            <a class="p-2 text-greenish fa" v-if="loggedInUser && !loggedInUser.presenter  && presenter" href="javascript:void(0)" title="Raise Hand" @click="raiseHand()"><i class="fa fa-hand-paper"></i></a>
             <!--a class="p-2 text-dark fa" href="javascript:void(0)" title="Notifications"><i class="fa fa-bell"></i></a-->
-            <a class="ml-md-5 text-dark fa" href="javascript:void(0)" title="Clear Workspace" @click="toggleModel('confirmbox-clearworkspace')"><i class="fa fa-sync"></i></a>
-            <a href="javascript:void(0)"  v-if="loggedInUser && loggedInUser.presenter" title="End Session" class="ml-md-3 text-dark fa" @click="toggleModel('confirmbox-endclass')"><i class="fas fa-sign-out-alt"></i></a>
+            <a class=" text-greenish fa" href="javascript:void(0)" title="Clear Workspace" @click="toggleModel('confirmbox-clearworkspace')"><i class="fa fa-sync"></i></a>
+            <a href="javascript:void(0)"  v-if="loggedInUser && loggedInUser.presenter" title="End Session" class="ml-md-3 text-greenish fa" @click="toggleModel('confirmbox-endclass')"><i class="fas fa-sign-out-alt"></i></a>
           </nav>
         </div>
-        <div class="d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm nav-bar">
+        <div class="d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bottom-bg border-bottom shadow-sm nav-bar">
           <nav class="my-0 mr-md-auto font-weight-normal">
-            <select  v-if="loggedInUser && loggedInUser.presenter">
-              <option>Classroom View</option>
-              <option>Conference View</option>
+            <select class="slecct-menu" @change="changeLayout"  v-if="loggedInUser && loggedInUser.presenter">
+              <option :selected="layout=='classroom-view'" value="classroom-view">Classroom View</option>
+              <option :selected="layout=='conference-view'" value="conference-view">Conference View</option>
             </select>
             <span class="breakout-name" v-if="!loggedInUser || !loggedInUser.presenter">{{currentBreakout ? currentBreakout.name : 'Main Room'}}</span>
-            <select @change="enterRoom" v-if="loggedInUser && loggedInUser.presenter">
+            <select class="slecct-menu" @change="enterRoom" v-if="loggedInUser && loggedInUser.presenter">
               <option :selected="breakoutIndex==-1" value="-1">Main Room</option>
               <option :selected="breakoutIndex==index" v-if="breakouts.length" :value="index" v-for="(breakout,index) in breakouts">{{breakout.name}}</option>
               <option v-if="!currentBreakout" value="create">Create Breakout</option>
@@ -108,7 +90,7 @@
               <div class="dropdown-container participant-container">
                 <div class="notifications dropdown dd-trigger" @click="showParticipants=!showParticipants">
                   <span class="count animated" id="notifications-count">{{totalParticipants}}</span>
-                  <span class="fa fa-users"></span> 
+                  <span class="fa fa-users text-white"></span> 
                 </div>
                 <div class="dropdown-menu animated p-0" :class="{'fadeOutUp': !showParticipants,'fadeInDown': showParticipants,'d-block': showParticipants}">
                   <div class="dropdown-header">
@@ -123,31 +105,31 @@
                           <img :src="user.profileImage" alt="" width="32"  @click="chatWith(user.identity)">
                         </div>
                       </div>
-                      <div class="notification-text">
-                         <span class="highlight"  @click="chatWith(user.identity)">{{user.peerId==loggedInUser.peerId ? 'Me' : user.firstName + ' '+ user.lastName}}</span>
-                         <br>
+                      <div class="notification-text col-sm-12">
+                         <span class="highlight"  @click="chatWith(user.identity)">{{user.peerId==loggedInUser.peerId ? 'Me' : user.firstName}}</span>
                          <span v-if="user.presenter" class="badge badge-success">Presenter</span>
-                         <span v-if="!user.presenter && loggedInUser.presenter" @click="changePermission(user,'video')" :class="{'text-danger': user.permissions.video,'text-dark': !user.permissions.video}"><i class="fa" :class="{'fa-video': user.permissions.video,'fa-video-slash': !user.permissions.video}"></i></span>
-                         <span v-if="!user.presenter && loggedInUser.presenter" @click="changePermission(user,'audio')" :class="{'text-danger': user.permissions.audio,'text-dark': !user.permissions.audio}"><i class="fa" :class="{'fa-microphone': user.permissions.audio,'fa-microphone-slash': !user.permissions.audio}"></i></span>
-                         <span v-if="!user.presenter && loggedInUser.presenter" @click="changePermission(user,'edit')" :class="{'text-danger': user.permissions.edit,'text-dark': !user.permissions.edit}"><i class="fa fa-edit"></i></span>
+                         <span class="text-greenish ml-4 float-right" :title="!user.permissions.edit ? 'Enable Edit' : 'Disable Edit'" v-if="!user.presenter && loggedInUser.presenter"  @click="changePermission(user,'edit')" :class="{'inactive': !user.permissions.edit}"><i class="fa fa-pencil-alt"></i></span>
+                         <span class="text-greenish ml-4 float-right" :title="!user.permissions.audio ? 'Enable Audio' : 'Disable Audio'" v-if="!user.presenter && loggedInUser.presenter" @click="changePermission(user,'audio')" :class="{'inactive': !user.permissions.audio}"><i class="fa fa-microphone"></i></span>
+                         <span class="text-greenish ml-4 float-right" :title="!user.permissions.video ? 'Enable Video' : 'Disable Video'" v-if="!user.presenter && loggedInUser.presenter" @click="changePermission(user,'video')" :class="{'inactive': !user.permissions.video}"><i class="fa fa-video"></i></span>
+                         
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <a class="ml-md-3 text-dark fa" href="javascript:void(0)" title="Toggle Fullscreen" @click="toggleFullscreen('discussion_board')"><i class="fa fa-expand"></i></a>
-            <a class="ml-md-3 text-dark fa" href="javascript:void(0)" title="Video Setting"><i class="fa fa-cog"></i></a>
+            <a class="ml-md-3 text-white fa" href="javascript:void(0)" title="Toggle Fullscreen" @click="toggleFullscreen('content-block')"><i class="fa fa-expand"></i></a>
+            <a class="ml-md-3 text-white fa" href="javascript:void(0)" title="Video Setting"><i class="fa fa-cog"></i></a>
           </nav>
           <nav class="my-2 my-md-0 mr-md-3">
-            <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 fa" href="javascript:void(0)" v-if="loggedInUser && loggedInUser.presenter " title="Share Screen" id="toggleScreen" @click="toggleScreen" :class="{'text-danger': isScreenShared,'text-dark': !isScreenShared}"><i class="fa fa-desktop"></i></a>
-            <a v-if="loggedInUser && (loggedInUser.presenter || loggedInUser.permissions.video)" class="p-2 fa" href="javascript:void(0)" title="Toggle Video" id="toggleVideo" @click="toggleVideo" :class="{'text-danger': isVidAvailable,'text-dark': !isVidAvailable}"><i class="fa" :class="{'fa-video': isVidAvailable,'fa-video-slash': !isVidAvailable}"></i></a>
-            <a v-if="loggedInUser && (loggedInUser.presenter || loggedInUser.permissions.audio)" class="p-2 fa" href="javascript:void(0)" title="Toggle Audio" id="toggleAudio" @click="toggleAudio"  :class="{'text-danger': isAudioAvailable,'text-dark': !isAudioAvailable}"><i class="fa" :class="{'fa-microphone': isAudioAvailable,'fa-microphone-slash': !isAudioAvailable}"></i></a>
+            <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 fa" href="javascript:void(0)" v-if="loggedInUser && loggedInUser.presenter " title="Share Screen" id="toggleScreen" @click="toggleScreen" :class="{'text-danger': isScreenShared,'text-white': !isScreenShared}"><i class="fa fa-desktop"></i></a>
+            <a v-if="loggedInUser && (loggedInUser.presenter || loggedInUser.permissions.video)" class="p-2 fa" href="javascript:void(0)" title="Toggle Video" id="toggleVideo" @click="toggleVideo" :class="{'text-danger': isVidAvailable,'text-white': !isVidAvailable}"><i class="fa" :class="{'fa-video': isVidAvailable,'fa-video-slash': !isVidAvailable}"></i></a>
+            <a v-if="loggedInUser && (loggedInUser.presenter || loggedInUser.permissions.audio)" class="p-2 fa" href="javascript:void(0)" title="Toggle Audio" id="toggleAudio" @click="toggleAudio"  :class="{'text-danger': isAudioAvailable,'text-white': !isAudioAvailable}"><i class="fa" :class="{'fa-microphone': isAudioAvailable,'fa-microphone-slash': !isAudioAvailable}"></i></a>
           </nav>
         </div>  
        </header>
-       <div class="d-flex flex-column flex-md-row p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm playground">
-        <div class="col-md-9 left-sidebar col-sm-12 p-0" :class="{'no-edit': !loggedInUser || (!loggedInUser.presenter && currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity)}">
+       <div class="d-flex flex-column flex-md-row p-3 px-md-4 mb-3  border-bottom shadow-sm playground">
+        <div id="content-block" class="col-md-9 left-sidebar col-sm-12 p-0" :class="{'no-edit': !loggedInUser || (!loggedInUser.presenter && !loggedInUser.permissions.edit && (!currentBreakout || currentBreakout.groupLeader !=loggedInUser.identity) )}">
           <!-- Tabs nav started -->
           <ul class="nav nav-tabs" id="play-menu">
             <li class="nav-item dropdown">
@@ -175,16 +157,23 @@
               <p>Welcome to Virtual Discussion</p>
           </div>
           <div v-for="(item,index) in contentTabs" class="content-tabs  position-relative" :class="{'d-block': currentTab===item.id,'d-none': currentTab!==item.id}">
-            <iframe class="youtube-player position-absolute border-0" allowfullscreen allow="autoplay" v-if="item.type==='youtube'" :youtubeId="item.id" :src="'https://www.youtube.com/embed/'+item.videoId+'?autoplay='+(currentTab===item.id ? 1 : 0)+'&controls=1'"></iframe>
+            <youtube class="youtube-player position-absolute border-0" :video-id="item.videoId" :player-vars="{ autoplay: 0, controls: 1 }" @playing="updatePausedYT('play',$event)" @paused="updatePausedYT('pause',$event)" v-if="item.type==='youtube' && loggedInUser && (loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader ==loggedInUser.identity))"></youtube>
+            <youtube class="youtube-player position-absolute border-0" :video-id="item.videoId" :player-vars="{ autoplay: 0, controls: 0 }" v-if="item.type==='youtube' && loggedInUser && (!loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity))"></youtube>
+            
             <code-editor  v-if="item.type==='code'" :item="item" :socket="socket" :discussion-id="discussionId" @language-changed="languageChanged"></code-editor>
-            <video class="col-sm-12" style="max-height:100%;" controls autoplay :src="item.url" v-if="item.type==='media' && item.mediaType==='video' && loggedInUser && (loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader ==loggedInUser.identity))"></video>
-            <video class="col-sm-12" style="max-height:100%;" autoplay :src="item.url" v-if="item.type==='media' && item.mediaType==='video' && loggedInUser && (!loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity))"></video>
-            <audio class="col-sm-12" style="top:43%;" autoplay v-if="item.type==='media' && item.mediaType==='audio' && loggedInUser && (!loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity))">
+            
+            <video class="col-sm-12" :id="'video_'+item.id" style="max-height:100%;" @seeked="updatePaused(item.id,$event)" @play="updatePaused(item.id,$event)" @pause="updatePaused(item.id,$event)" controls autoplay :src="item.url" v-if="item.type==='media' && item.mediaType==='video' && loggedInUser && (loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader ==loggedInUser.identity))"></video>
+            <video class="col-sm-12" muted="muted" :id="'video_'+item.id" style="max-height:100%;" :src="item.url" v-if="item.type==='media' && item.mediaType==='video' && loggedInUser && (!loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity))"></video>
+            <span class="position-absolute toggle-mute" @click="toggleMute('video_'+item.id)" v-if="item.type==='media' && item.mediaType==='video' && loggedInUser && (!loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity))"><i class="fa" :class="{'fa-volume-up': speaker['video_'+item.id],'fa-volume-mute': !speaker['video_'+item.id]}"></i></span>
+
+            <audio class="col-sm-12" muted="muted" :id="'audio_'+item.id" style="top:43%;" v-if="item.type==='media' && item.mediaType==='audio' && loggedInUser && (!loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity))">
               <source :src="item.url"></source>
             </audio>
-            <audio class="col-sm-12" style="top:43%;" autoplay v-if="item.type==='media' && item.mediaType==='audio' && loggedInUser && (loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader ==loggedInUser.identity))">
+            <audio class="col-sm-12" :id="'audio_'+item.id" style="top:43%;" controls v-if="item.type==='media' && item.mediaType==='audio' && loggedInUser && (loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader ==loggedInUser.identity))">
               <source :src="item.url"></source>
             </audio>
+            <span class="position-absolute toggle-mute" @click="toggleMute('audio_'+item.id)" v-if="item.type==='media' && item.mediaType==='audio' && loggedInUser && (!loggedInUser.presenter || (currentBreakout && currentBreakout.groupLeader !=loggedInUser.identity))"><i class="fa" :class="{'fa-volume-up': speaker['audio_'+item.id],'fa-volume-mute': !speaker['audio_'+item.id]}"></i></span>
+            
             <white-board :item="item" v-if="item.type==='whiteboard' || item.type==='content' " :socket="socket"></white-board>
             <div class="overlay position-absolute"></div>
           </div>
@@ -192,11 +181,11 @@
           <!-- Loader -->
           <div class="modal-backdrop fade show loader" :class="{'d-block': isLoading ,'d-none': !isLoading}"><div class="position-fixed loader-container"><div class="lds-ripple"><div class="border-white"></div><div class="border-white"></div></div></div></div>
           <!-- Models started -->
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-clearworkspace'],'d-none': !showItem['confirmbox-clearworkspace']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-clearworkspace'],'d-none': !showItem['confirmbox-clearworkspace']}">
             <div class="modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Clear workspace</h5>
+                  <h5 class="modal-title text-uppercase">Clear workspace</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('confirmbox-clearworkspace')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -211,11 +200,11 @@
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-endclass'],'d-none': !showItem['confirmbox-endclass']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-endclass'],'d-none': !showItem['confirmbox-endclass']}">
             <div class="modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">End Class</h5>
+                  <h5 class="modal-title text-uppercase">End Class</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('confirmbox-endclass')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -231,11 +220,11 @@
             </div>
           </div>
           
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['createbreakout'],'d-none': !showItem['createbreakout']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['createbreakout'],'d-none': !showItem['createbreakout']}">
             <div class="modal-dialog modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Create breakout room</h5>
+                  <h5 class="modal-title text-uppercase">Create breakout room</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('createbreakout')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -248,19 +237,19 @@
                     </div>
                   </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer d-block">
                   <button type="button" class="btn btn-secondary float-left" data-dismiss="modal" @click="toggleModel('createbreakout');manageBreakout();toggleModel('breakout')">Manage Rooms</button>
-                  <button type="button" class="btn btn-secondary float-right mr-2" data-dismiss="modal" @click="toggleModel('createbreakout')">Close</button>
+                  <button type="button" class=" btn cancel float-right mr-2" data-dismiss="modal" @click="toggleModel('createbreakout')">Close</button>
                   <button type="button" class="btn btn-secondary float-right" data-dismiss="modal" :disabled="breakoutName==''" @click="createBreakout">Add Room</button>
                 </div>
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-participant'],'d-none': !showItem['confirmbox-participant']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-participant'],'d-none': !showItem['confirmbox-participant']}">
             <div class="modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Remove user from breakout room(s)</h5>
+                  <h5 class="modal-title text-uppercase">Remove user from breakout room(s)</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('confirmbox-participant')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -269,17 +258,17 @@
                   <p><strong>Are you sure you want to remove this participant from this room?</strong></p>
                 </div>
                 <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('confirmbox-participant');toggleModel('breakout');">Cancel</button>
+                  <button type="button" class="btn cancel" data-dismiss="modal" @click="toggleModel('confirmbox-participant');toggleModel('breakout');">Cancel</button>
                   <button type="button" class="btn btn-primary" @click="toggleModel('confirmbox-participant');removeParticipant(participantToRemove.index,participantToRemove.identity);toggleModel('breakout')">Remove</button>
                 </div>
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-breakall'],'d-none': !showItem['confirmbox-breakall']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-breakall'],'d-none': !showItem['confirmbox-breakall']}">
             <div class="modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">End all breakout room(s)</h5>
+                  <h5 class="modal-title text-uppercase">End all breakout room(s)</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('confirmbox-breakall')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -288,17 +277,17 @@
                   <p><strong>Are you sure you want to end all breakout room(s)?</strong></p>
                 </div>
                 <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('breakout');toggleModel('confirmbox-breakall')">Cancel</button>
+                  <button type="button" class=" btn cancel" data-dismiss="modal" @click="toggleModel('breakout');toggleModel('confirmbox-breakall')">Cancel</button>
                   <button type="button" class="btn btn-primary" @click="endAllBreakout();">Remove</button>
                 </div>
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-breakselected'],'d-none': !showItem['confirmbox-breakselected']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-breakselected'],'d-none': !showItem['confirmbox-breakselected']}">
             <div class="modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">End selected breakout room(s)</h5>
+                  <h5 class="modal-title text-uppercase">End selected breakout room(s)</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('confirmbox-breakselected')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -313,11 +302,11 @@
               </div>
             </div>
           </div>
-          <div class="modal manage-breakout-modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['breakout'],'d-none': !showItem['breakout']}">
+          <div class="modal  classroom-popups manage-breakout-modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['breakout'],'d-none': !showItem['breakout']}">
             <div class="modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Manage breakout</h5>
+                  <h5 class="modal-title text-uppercase">Manage breakout</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('breakout')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -326,7 +315,7 @@
                   <p v-if="!breakouts.length">No rooms available.</p>
                   <table class="table table-borderless" v-if="breakouts.length">
                     <template  v-for="(bkOut,index) in breakouts">
-                      <tr>
+                      <tr class="namelistcontact">
                         <td><input type="checkbox" :value="index" v-model="selectedBreakouts" /></td>
                         <td><span class="float-left">{{bkOut.name}}</span>&nbsp;<span class="float-right">({{bkOut.participants.length}})</span></td>
                         <td>
@@ -341,7 +330,7 @@
                             </span>
                           </div>
                         </td>
-                        <td>
+                        <td class="add-list">
                           <a href="javascript:void(0)" @click="addParticipantToBreakout(index)">+ Add Participants</a>
                         </td>
                       </tr>
@@ -349,16 +338,16 @@
                         <td>&nbsp;</td>
                         <td colspan="3">
                           <table class="table table-borderless">
-                            <tr>
+                            <tr class="leadactions">
                               <th>Lead</th>
                               <th>Participants</th>
                               <th>Action</th>
                             </tr>
                             <tr v-if="!bkOut.participants.length"><td colspan="3">No participants in this room</td></tr>
                             <tr v-for="identity in bkOut.participants">
-                              <td><input type="radio" v-model="bkOut.groupLeader" :value="identity" /></td>
+                              <td><input type="radio" @change="changeGroupLeader(index, identity)" v-model="bkOut.groupLeader" :value="identity" /></td>
                               <td>{{allParticipants[identity].firstName+ ' '+ allParticipants[identity].lastName}}</td>
-                              <td><a title="Remove participant from room" href="javascript:void(0)" @click="toggleModel('breakout');confirmParticipantRemove(index,identity)"><i class="fas fa-sign-out-alt"></i></a></td>
+                              <td class="signoutcolor"><a title="Remove participant from room" href="javascript:void(0)" @click="toggleModel('breakout');confirmParticipantRemove(index,identity)"><i class="fas fa-sign-out-alt"></i></a></td>
                             </tr>
                           </table>
                         </td>
@@ -370,16 +359,16 @@
                 <div class="modal-footer">
                   <button type="button"  :disabled="selectedBreakouts.length <= 0" class="btn btn-primary" @click="toggleModel('breakout');toggleModel('confirmbox-breakselected')">End Selected Room(s)</button>
                   <button type="button" class="btn btn-primary" @click="toggleModel('breakout');toggleModel('confirmbox-breakall')">End All Room(s)</button>
-                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('breakout')">Cancel</button>
+                  <button type="button" class=" btn cancel" data-dismiss="modal" @click="toggleModel('breakout')">Cancel</button>
                 </div>
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['participants'],'d-none': !showItem['participants']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['participants'],'d-none': !showItem['participants']}">
             <div class="modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Add participants from main room</h5>
+                  <h5 class="modal-title text-uppercase">Add participants from main room</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('participants')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -391,30 +380,30 @@
                   <table class="table" v-if="Object.keys(remaining_participants).length > 1">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Options</th>
+                        <th class="bg-secondary text-white border-left">Name</th>
+                        <th class="bg-secondary text-white border-left">Options</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="participant in remaining_participants" v-if="!participant.presenter">
-                        <td>{{participant.firstName+ ' '+ participant.lastName}}</td>
+                        <td class="roomlist">{{participant.firstName+ ' '+ participant.lastName}}</td>
                         <td><input type="checkbox" :value="participant.identity" v-model="selectedParticipants" /></td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="toggleModel('breakout');toggleModel('participants')">Cancel</button>
+                  <button type="button" class=" btn cancel" data-dismiss="modal" @click="toggleModel('breakout');toggleModel('participants')">Cancel</button>
                   <button type="button"  :disabled="selectedParticipants.length <= 0" class="btn btn-primary" @click="addParticipants(addBreakoutIndex);">Add</button>
                 </div>
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['youtube'],'d-none': !showItem['youtube']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['youtube'],'d-none': !showItem['youtube']}">
             <div class="modal-dialog modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Load youtube video</h5>
+                  <h5 class="modal-title text-uppercase">Load youtube video</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('youtube')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -436,11 +425,11 @@
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['import'],'d-none': !showItem['import']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['import'],'d-none': !showItem['import']}">
             <div class="modal-dialog modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Import template file</h5>
+                  <h5 class="modal-title text-uppercase">Import template file</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('import')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -462,11 +451,11 @@
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['media'],'d-none': !showItem['media']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['media'],'d-none': !showItem['media']}">
             <div class="modal-dialog modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Load media content</h5>
+                  <h5 class="modal-title text-uppercase">Load media content</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('media')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -498,11 +487,11 @@
               </div>
             </div>
           </div>
-          <div class="modal" tabindex="-1" role="dialog" :class="{'d-block': showItem['content'],'d-none': !showItem['content']}">
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['content'],'d-none': !showItem['content']}">
             <div class="modal-dialog modal-dialog modal-lg" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Load Content</h5>
+                  <h5 class="modal-title text-uppercase">Load Content</h5>
                   <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="toggleModel('content')">
                     <span aria-hidden="true">&times;</span>
                   </button>
@@ -694,6 +683,7 @@
             
           </div>
     </template>
+    <!--script type="text/javascript" src="https://www.youtube.com/iframe_api"></script-->
     <script src="js/ice.js"></script>
     <script src="js/screen/adapter.js"></script>
     <!-- We are using webrtc extension for screen capture on chrome, so using their screenid too -->

@@ -18,6 +18,10 @@ var Utility = function () {
       if (!workplace['chat']) workplace['chat'] = {}
       if (!workplace['whiteboard']) workplace['whiteboard'] = {}
       if (!workplace['settings']) workplace['settings'] = []
+      if (!workplace['layout']) workplace['layout'] = 'classroom-view'
+      // layout change
+      socket.emit('layout',workplace['layout']);
+        
       // dump tabs
       for (let i = 0; i < workplace['tabs'].length; i++) {
         socket.emit('tabadd', JSON.stringify(workplace['tabs'][i]))
@@ -197,6 +201,26 @@ var Utility = function () {
           io.to(presenter.peerId).emit('raisehand', { user: user, timestamp: new Date() })
         }
       })
+    });
+
+    socket.on('layout',function (name){
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('layout changed on ' + discussionId + ' by ' + socket.id) }
+      redis.hget('workplace', discussionId, (err, workplace) => {
+        if (err && CONFIG.DEBUG) console.warn(err)
+        
+        if (workplace) {
+          workplace = JSON.parse(workplace)
+          workplace['layout']=name;
+          redis.hset('workplace', discussionId, JSON.stringify(workplace))
+        }
+      })
+      socket.to(discussionId).emit('layout', name);
+    });
+    socket.on('updatepaused',function (tabId, mediaType, eventType, timestamp){
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('updatepaused changed on ' + discussionId + ' by ' + socket.id) }
+      socket.to(discussionId).emit('updatepaused', tabId, mediaType, eventType, timestamp);
     });
     socket.on('exporttemplate', function (cb) {
       let discussionId = mapSocketToDiscussion[socket.id]

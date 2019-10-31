@@ -35,8 +35,9 @@ module.exports=(...args)=>{
 						this.controlContainerLeft.appendChild(control.containerAppend);
 					break;
 					case 'top':
-					default:
 						this.controlContainerTop.appendChild(control.containerAppend);
+					default:
+						if(this.controlContainerLeft.querySelector('.container-'+this.controls[cKey].place)) this.controlContainerLeft.querySelector('.container-'+this.controls[cKey].place).appendChild(control.containerAppend);
 					break;
 				}
 				this.byName[this.controls[cKey].name] = control;
@@ -184,6 +185,28 @@ module.exports=(...args)=>{
 			return {
 				input: input,
 				//integerOutput: integerOutput,
+				containerAppend: container
+			}
+		};
+		Controls.prototype.constructors.group = function createGroup (control) {
+			var container = document.createElement("div");
+			container.className = (control.classAppend || "") + "container-group position-relative";
+			container.appendChild(this.button({
+				html: "i",
+				elemClass: control.elemClass,
+				title: control.title,
+				action: function () {
+					let elem=container.querySelector('.container-'+control.value);
+					elem.style.display=elem.style.display == 'none' ? 'block' : 'none';
+				}
+			}).containerAppend);
+			var controlGroupContainer = document.createElement("div");
+			controlGroupContainer.className='control-group position-absolute'+' container-'+control.value;
+			controlGroupContainer.style.display='none';
+			container.appendChild(controlGroupContainer);
+			
+			return {
+				input: container,
 				containerAppend: container
 			}
 		};
@@ -5989,6 +6012,50 @@ module.exports=(...args)=>{
 			this.setStrokeColor(new tinycolor());
 			this.changeToolSize(5, true);
 			this.changeStrokeSize(5, true);
+			
+			this.rotateControl=$(container).find('.rotateControl');
+			this.resizeControl=$(container).find('.resizeControl');
+				
+			// add rotate and resize control
+			if(!this.rotateControl.length){
+				this.rotateControl=$('<a href="javascript:void(0)" class="position-absolute text-dark rotateControl" style="display:none;"><i class="fa fa-redo"></i></a>');
+				this.rotateControl.appendTo($(container));
+			}
+			if(!this.resizeControl.length){
+				this.resizeControl=$('<a href="javascript:void(0)" class="position-absolute text-dark resizeControl" style="display:none;"><i class="fa fa-expand-arrows-alt"></i></a>');
+				this.resizeControl.appendTo($(container));
+			}
+			this.isRotating = false;
+			this.isResizing = false;
+			this.initialCords=null;
+			this.initialDrawingCords=null;
+			this.rotateControl
+			.click(e=>{
+					this.initialCords=e;
+					this.isRotating = !this.isRotating;
+			})
+			// .mousemove(e=>{
+			//     if(isRotating){
+			//     	let angle=Math.atan2(initialCords.clientY - e.clientY, initialCords.clientX - e.clientX);
+			//     	console.log('rotating',angle);
+			//     	this.rotateDrawing(angle);
+			//     }
+			//  });
+			this.resizeControl
+			.click(e=>{
+				  this.initialCords=e;
+			    this.initialDrawingCords=Object.assign({},this.localDrawings[this.selectedDrawingIndex]);
+			    this.isResizing = !this.isResizing;
+			})
+			// .mousemove(_=>{
+			//     if(isResizing){
+			//     	console.log('resizing');
+			//     	this.resizeDrawing();
+			//     }
+			//  })
+			// .mouseup(_=>{
+			//     isResizing = false;
+			// });
 
 			$(this.controls.byName["tool-color"].input).spectrum("set", this.current_color);
 			$(this.controls.byName["tool-strokecolor"].input).spectrum("set", this.current_stroke_color);
@@ -6040,6 +6107,7 @@ module.exports=(...args)=>{
 
 		// Redraws everything taking into account mirroring and rotation
 		Paint.prototype.redrawAll = function redrawAll () {
+			this.hideDrawingControls();
 			for (var k = 0; k < this.canvasArray.length; k++) {
 				var ctx = this.canvasArray[k].getContext("2d");
 
@@ -6089,7 +6157,85 @@ module.exports=(...args)=>{
 				scale: this.scale
 			});
 		};
+		Paint.prototype.showDrawingControls = function showDrawingControls (e, ne,se){
+			if(typeof this.selectedDrawingIndex != 'undefined'){
+				let adjustX=$('#content-block').offset().left;
+				let adjustY=$('#content-block').offset().top + $('#play-menu').height();
+				// Don't show the control after setting offset, hidding element's offset keep in increasing
+				this.rotateControl.show().offset({top: ne[1]+adjustY - 15,left: ne[0]+adjustX });
+				this.resizeControl.show().offset({top: se[1]+adjustY, left: se[0]+adjustX});
+			}
+		};
+		Paint.prototype.hideDrawingControls = function hideDrawingControls (){
+				this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
+				this.isRotating=false;
+				this.isResizing=false;
+				this.initialDrawingCords=null;
+				if(this.rotateControl) this.rotateControl.hide();
+				if(this.resizeControl) this.resizeControl.hide();
+		};
+		
+		Paint.prototype.rotateDrawing = function rotateDrawing(angle){
+			if(typeof this.selectedDrawingIndex !='undefined0'){
+				this.localDrawings[this.selectedDrawingIndex].rotate=angle;
+				this.redrawLocals();
+				this.drawSelection(angle);
+			}
+		};
+		Paint.prototype.resizeDrawing = function resizeDrawing(change,newCords){
+			if(typeof this.selectedDrawingIndex != 'undefined'){
+				let drawing=this.localDrawings[this.selectedDrawingIndex];
+				switch(drawing.type){
+					case 'circle':
+						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+change;
+						this.localDrawings[this.selectedDrawingIndex].y1=this.initialDrawingCords.y1+change;
+					break;
+					case 'rhombus':
+						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+change;
+						this.localDrawings[this.selectedDrawingIndex].y1=this.initialDrawingCords.y1+change;
+					break;
+					case 'triangle':
+						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+change;
+					break;
+					case 'arrow':
+						this.localDrawings[this.selectedDrawingIndex].x1=newCords[0];
+						this.localDrawings[this.selectedDrawingIndex].y1=newCords[1];
+					break;
+					case 'line':
+						this.localDrawings[this.selectedDrawingIndex].x1=newCords[0];
+						this.localDrawings[this.selectedDrawingIndex].y1=newCords[1];
+					break;
+				}
+				this.redrawLocals();
+				this.drawSelection(0);	
+			}
+		};
+		Paint.prototype.drawSelection = function drawSelection (angle){
+			if(!this.rectanglePoints.length) return;
 
+			this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
+			var context = this.effectsCanvasCtx;
+			context.save();
+			context.globalCompositeOperation="destination-over";
+			if(angle){
+				context.translate( (this.rectanglePoints[1][0] + this.rectanglePoints[0][0]) / 2, (this.rectanglePoints[1][1] + this.rectanglePoints[0][1]) / 2 );
+				context.rotate(angle);
+				context.translate( this.rectanglePoints[0][0], this.rectanglePoints[0][1]);
+			}
+			context.setLineDash([5, 3]);
+			context.beginPath();
+			context.moveTo(this.rectanglePoints[0][0],this.rectanglePoints[0][1]);
+			context.lineTo(this.rectanglePoints[1][0],this.rectanglePoints[1][1]);
+			context.lineTo(this.rectanglePoints[2][0],this.rectanglePoints[2][1]);
+			context.lineTo(this.rectanglePoints[3][0],this.rectanglePoints[3][1]);
+			context.lineTo(this.rectanglePoints[0][0],this.rectanglePoints[0][1]);
+			context.strokeStyle = '#6d6d6d'; /* gray */
+			context.lineWidth = 1 *  this.local.zoom;
+			context.stroke();
+			context.closePath();
+			context.restore();
+			this.showDrawingControls(event,[this.rectanglePoints[2][0],this.rectanglePoints[2][1]], [this.rectanglePoints[1][0],this.rectanglePoints[1][1]] );
+		};
 		Paint.prototype.setRotation = function setRotation (value) {
 			this.rotation = value % 360;
 			this.redrawAll();
@@ -6443,7 +6589,7 @@ module.exports=(...args)=>{
 				if (this.current_tool == "picker" && key == 18 && this.previous_tool) {
 					this.changeTool(this.previous_tool);
 				}
-				if (this.current_tool == "select" && key == 46 && this.selectedDrawingIndex) {
+				if (this.current_tool == "select" && key == 46 && typeof this.selectedDrawingIndex !='undefined') {
 					this.removeDrawing(this.selectedDrawingIndex);
 				}
 			}
@@ -7170,6 +7316,7 @@ module.exports=(...args)=>{
 			this.exectool("remove");
 			this.current_tool = tool;
 			delete this.selectedDrawingIndex;
+			this.hideDrawingControls();
 			this.trianglePoints=null;
 			this.effectsCanvas.style.opacity=1;
 			if(this.clearHighlightTimer) clearTimeout(this.clearHighlightTimer);
@@ -7179,8 +7326,7 @@ module.exports=(...args)=>{
 
 			for (var name in this.controls.byName)
 				this.controls.byName[name].input.classList.remove("paint-selected-tool");
-
-			this.controls.byName[tool].input.classList.add("paint-selected-tool");
+			if(this.controls.byName[tool].input) this.controls.byName[tool].input.classList.add("paint-selected-tool");
 			this.exectool("setup");
 		};
 
@@ -7277,15 +7423,25 @@ module.exports=(...args)=>{
 				type: "button",
 				html: "i",
 				place: "left",
-				elemClass: "tool-item tool-grab",
+				elemClass: "tool-item tool-select fa fa-mouse-pointer",
 				title: "Change tool to select shape",
 				value: "select",
 				action: this.changeTool.bind(this)
 			}, {
+				/* Always place group container control first before entering place(shapes) as it's value(shapes)*/
+				name: "shapes",
+				type: "group",
+				html: "i",
+				place: "left",
+				elemClass: "tool-item fa fa-shapes",
+				title: "Select shape to draw",
+				value: "shapes",
+				action: _=>{}
+			}, {
 				name: "line",
 				type: "button",
 				html: "i",
-				place: "left",
+				place: "shapes",
 				elemClass: "tool-item fa fa-slash",
 				title: "Change tool to line",
 				value: "line",
@@ -7294,7 +7450,7 @@ module.exports=(...args)=>{
 				name: "arrow",
 				type: "button",
 				html: "i",
-				place: "left",
+				place: "shapes",
 				elemClass: "tool-item tool-arrow",
 				title: "Change tool to arrow",
 				value: "arrow",
@@ -7303,7 +7459,7 @@ module.exports=(...args)=>{
 				name: "circle",
 				type: "button",
 				html: "i",
-				place: "left",
+				place: "shapes",
 				elemClass: "tool-item tool-circle",
 				title: "Change tool to circle",
 				value: "circle",
@@ -7312,7 +7468,7 @@ module.exports=(...args)=>{
 				name: "ellipse",
 				type: "button",
 				html: "i",
-				place: "left",
+				place: "shapes",
 				elemClass: "tool-item tool-pen",
 				title: "Change tool to bezier curve, Double click when finished",
 				value: "ellipse",
@@ -7321,7 +7477,7 @@ module.exports=(...args)=>{
 				name: "triangle",
 				type: "button",
 				html: "i",
-				place: "left",
+				place: "shapes",
 				elemClass: "tool-item tool-triangle",
 				title: "Change tool to triangle",
 				value: "triangle",
@@ -7330,7 +7486,7 @@ module.exports=(...args)=>{
 				name: "rhombus",
 				type: "button",
 				html: "i",
-				place: "left",
+				place: "shapes",
 				elemClass: "tool-item tool-rectangle",
 				title: "Change tool to rhombus",
 				value: "rhombus",
@@ -7816,6 +7972,24 @@ module.exports=(...args)=>{
 				// Get the coordinates relative to the canvas
 				var targetCoords = paint.getCoords(event);
 				var scaledCoords = paint.scaledCoords(targetCoords, event);
+				// Is rotating or resizing?
+				if (event.type == "mousemove" && typeof paint.selectedDrawingIndex !='undefined' && (paint.isResizing || paint.isRotating)) {
+					if(paint.isResizing){
+						let change=Math.max(event.clientX - paint.initialCords.clientX,event.clientY - paint.initialCords.clientY);
+						console.log('resizing',change);
+				    paint.resizeDrawing(change,scaledCoords);
+				    return;
+					}
+					if(paint.isRotating){
+						let angle=Math.atan2(paint.initialCords.clientY - event.clientY, paint.initialCords.clientX - event.clientX);
+			    	angle =angle * (180 / Math.PI);
+			    	//if(angle < 0 ) angle = 360+angle;
+			    	//console.log('rotating',angle);
+			    	paint.rotateDrawing(angle);
+			    	return;
+					}
+				}
+					
 
 				// First time we grab?
 				if (!paint.lastSelectCoords) {
@@ -7833,10 +8007,12 @@ module.exports=(...args)=>{
 						scaledLastSelectCoords[0]=Math.round((paint.local.leftTopX + (scaledLastSelectCoords[0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION;
 						scaledLastSelectCoords[1]=Math.round((paint.local.leftTopY + (scaledLastSelectCoords[1] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION;
 						
+						paint.hideDrawingControls();
 						paint.effectsCanvas.style.cursor = "move";
 						var keepSearching=true;
-						var rectanglePoints=[];
+						paint.rectanglePoints=[];
 						var drawing={},scaledDrawing={};
+						let minX,maxX,minY,maxY,minScaledX,maxScaledX,minScaledY,maxScaledY,diffX,diffY;
 						for(var i=paint.localDrawings.length; i >0 ; i--){
 							delete paint.selectedDrawingIndex;
 							drawing=Object.assign({},paint.localDrawings[i-1]);
@@ -7854,7 +8030,7 @@ module.exports=(...args)=>{
   									console.log('Inside circle');
 										paint.selectedDrawingIndex=i-1;
   									keepSearching=false;
-  									rectanglePoints=[
+  									paint.rectanglePoints=[
   										[scaledDrawing.x1 - scaledCircleRadius - 5, scaledDrawing.y1 + scaledCircleRadius + 5],
 											[scaledDrawing.x1 + scaledCircleRadius + 5, scaledDrawing.y1 + scaledCircleRadius + 5],
 											[scaledDrawing.x1 + scaledCircleRadius + 5, scaledDrawing.y1 - scaledCircleRadius - 5],
@@ -7863,16 +8039,62 @@ module.exports=(...args)=>{
   								}
 								break;
 								case 'rhombus':
-									var diffX=Math.abs(drawing.x1 - drawing.x);
+									diffX=Math.abs(drawing.x1 - drawing.x);
 									if(drawing.x <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= drawing.x + diffX && drawing.y - diffX <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= drawing.y){
 										console.log('Inside rhombus');
 										paint.selectedDrawingIndex=i-1;
   									keepSearching=false;
-  									rectanglePoints=[
+  									paint.rectanglePoints=[
   										[scaledDrawing.x - 5, scaledDrawing.y + 5],
 											[scaledDrawing.x1 + 5, scaledDrawing.y + 5],
 											[scaledDrawing.x1 + 5, scaledDrawing.y - (scaledDrawing.x1 - scaledDrawing.x) - 5],
 											[scaledDrawing.x - 5, scaledDrawing.y - (scaledDrawing.x1 - scaledDrawing.x) - 5]
+  									]
+									}
+								break;
+								case 'arrow':
+									minX=Math.min(drawing.x1,drawing.x);
+									minY=Math.min(drawing.y1,drawing.y);
+									maxX=Math.max(drawing.x1,drawing.x);
+									maxY=Math.max(drawing.y1,drawing.y);
+									
+									minScaledX=Math.min(scaledDrawing.x1,scaledDrawing.x);
+									minScaledY=Math.min(scaledDrawing.y1,scaledDrawing.y);
+									maxScaledX=Math.max(scaledDrawing.x1,scaledDrawing.x);
+									maxScaledY=Math.max(scaledDrawing.y1,scaledDrawing.y);
+									
+									diffX=Math.abs(drawing.x1 - drawing.x);
+									if(minX <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= maxX && minY <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= maxY){
+										paint.selectedDrawingIndex=i-1;
+  									keepSearching=false;
+  									paint.rectanglePoints=[
+  										[minScaledX - 10, maxScaledY + 10],
+											[maxScaledX + 10, maxScaledY + 10],
+											[maxScaledX + 10, minScaledY - 10],
+											[minScaledX - 10, minScaledY - 10]
+  									]
+									}
+								break;
+								case 'line':
+									minX=Math.min(drawing.x1,drawing.x);
+									minY=Math.min(drawing.y1,drawing.y);
+									maxX=Math.max(drawing.x1,drawing.x);
+									maxY=Math.max(drawing.y1,drawing.y);
+									
+									minScaledX=Math.min(scaledDrawing.x1,scaledDrawing.x);
+									minScaledY=Math.min(scaledDrawing.y1,scaledDrawing.y);
+									maxScaledX=Math.max(scaledDrawing.x1,scaledDrawing.x);
+									maxScaledY=Math.max(scaledDrawing.y1,scaledDrawing.y);
+									
+									diffX=Math.abs(drawing.x1 - drawing.x);
+									if(minX <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= maxX && minY <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= maxY){
+										paint.selectedDrawingIndex=i-1;
+  									keepSearching=false;
+  									paint.rectanglePoints=[
+  										[minScaledX - 10, maxScaledY + 10],
+											[maxScaledX + 10, maxScaledY + 10],
+											[maxScaledX + 10, minScaledY - 10],
+											[minScaledX - 10, minScaledY - 10]
   									]
 									}
 								break;
@@ -7903,7 +8125,7 @@ module.exports=(...args)=>{
 							    	console.log('inside triangle');
 							    	paint.selectedDrawingIndex=i-1;
   									keepSearching=false;
-  									rectanglePoints=[
+  									paint.rectanglePoints=[
   										[scaledDrawing.x - 5, scaledDrawing.y + 5],
 											[scaledDrawing.x1 + 5, scaledDrawing.y + 5],
 											[scaledDrawing.x1 + 5,scaledDrawing.y - ((scaledDrawing.x1 - scaledDrawing.x) * (Math.sqrt(3)/2) ) - 5],
@@ -7914,23 +8136,9 @@ module.exports=(...args)=>{
 							}
 							if(!keepSearching) break;
 						}
+						console.log('selectedIndex',paint.selectedDrawingIndex);
 						if(typeof paint.selectedDrawingIndex !== 'undefined'){
-							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
-							var context = paint.effectsCanvasCtx;
-							context.save();
-							context.globalCompositeOperation="destination-over";
-							context.setLineDash([5, 3]);
-							context.beginPath();
-							context.moveTo(rectanglePoints[0][0],rectanglePoints[0][1]);
-							context.lineTo(rectanglePoints[1][0],rectanglePoints[1][1]);
-							context.lineTo(rectanglePoints[2][0],rectanglePoints[2][1]);
-							context.lineTo(rectanglePoints[3][0],rectanglePoints[3][1]);
-							context.lineTo(rectanglePoints[0][0],rectanglePoints[0][1]);
-							context.strokeStyle = '#6d6d6d'; /* gray */
-							context.lineWidth = 1 *  paint.local.zoom;
-							context.stroke();
-							context.closePath();
-							context.restore();
+							paint.drawSelection(0);
 						}
 					}
 				}
@@ -7949,6 +8157,7 @@ module.exports=(...args)=>{
 					// Update last drag position
 					paint.lastSelectCoords = scaledCoords;
 					paint.redrawLocals();
+					paint.hideDrawingControls();
 				}		
 			},
 			line: function line (paint, event) {
@@ -8978,12 +9187,18 @@ module.exports=(...args)=>{
 			triangle: function (context, drawing, tiledCanvas) {
 				context.beginPath();
 				context.globalCompositeOperation="source-over";
+				if(drawing.rotate){
+					context.translate(((drawing.x + drawing.x1 + (( drawing.x1 + drawing.x )/2) ) / 3) ,((drawing.y + this.FIX_CANVAS_PIXEL_SIZE + drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE + (drawing.y + this.FIX_CANVAS_PIXEL_SIZE - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )) ) / 3));
+					context.rotate(drawing.rotate);
+					context.translate(-((drawing.x + drawing.x1 + (( drawing.x1 + drawing.x )/2) ) / 3),-((drawing.y + this.FIX_CANVAS_PIXEL_SIZE + drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE + (drawing.y + this.FIX_CANVAS_PIXEL_SIZE - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )) ) / 3));
+				}
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x1, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);			
 				context.lineTo( ( drawing.x1 + drawing.x )/2 , drawing.y - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )  + this.FIX_CANVAS_PIXEL_SIZE );			
 				context.strokeStyle = drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
 				context.lineWidth = drawing.stroke_size;
+				
 				context.closePath();
 				context.stroke();
 				context.fill();
@@ -8999,10 +9214,16 @@ module.exports=(...args)=>{
 				}
 			},
 			rhombus: function (context, drawing, tiledCanvas) {
+				context.save();
 				context.beginPath();
 				context.globalCompositeOperation="source-over";
 				var diffX=drawing.x1 - drawing.x;
 				var diffY=drawing.y1 - drawing.y;
+				if(drawing.rotate){
+					context.translate((drawing.x1 + drawing.x)/2 ,drawing.y + this.FIX_CANVAS_PIXEL_SIZE - diffX/2);
+					context.rotate(drawing.rotate);
+					context.translate(-((drawing.x1 + drawing.x)/2) ,-(drawing.y + this.FIX_CANVAS_PIXEL_SIZE - diffX/2));
+				}
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x1, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x1, drawing.y - diffX + this.FIX_CANVAS_PIXEL_SIZE);
@@ -9010,10 +9231,10 @@ module.exports=(...args)=>{
 				context.lineWidth=drawing.stroke_size;
 				context.strokeStyle=drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
-				context.closePath();
 				context.stroke();
 				context.fill();
-				
+				context.closePath();
+				context.restore();
 				if (tiledCanvas) {
 					var topLeftX=Math.min(drawing.x,drawing.x1,drawing.x - diffX);
 					var topLeftY=Math.min(drawing.y,drawing.y1,drawing.y - diffX);

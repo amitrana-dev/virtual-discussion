@@ -1,10 +1,11 @@
 'use strict'
 
 import Toasted from 'vue-toasted';
-
+import VueYouTubeEmbed from 'vue-youtube-embed';
 (function () {
   var Vue = require('vue')
   Vue.use(Toasted)
+  Vue.use(VueYouTubeEmbed)
   Vue.filter('capitalize', function (value) {
     if (!value) return ''
     value = value.toString()
@@ -31,6 +32,7 @@ import Toasted from 'vue-toasted';
       showMenu: false,
       showItem: { 'youtube': false, 'media': false, 'content': false },
       youtubeVideoId: '',
+      layout: 'classroom-view',
       templateFile: null,
       contentTabs: [],
       socket: null,
@@ -61,6 +63,7 @@ import Toasted from 'vue-toasted';
       notifications: [],
       showTimer: false,
       mediaList: [],
+      speaker: {},
       isLoadingMedia: false,
       totalMediaPages: 0,
       currentMediaPage: 1,
@@ -133,6 +136,13 @@ import Toasted from 'vue-toasted';
           that.loggedInUser = user
           that.isLoading = false
         })
+        that.socket.on('changeleader', function (identity) {
+          that.currentBreakout.groupLeader= identity;
+        })
+        that.socket.on('validuser', function (user) {
+          that.loggedInUser = user
+          that.isLoading = false
+        })
         that.socket.on('invaliduser', function (msg) {
           Vue.toasted.error(msg, { position: 'bottom-right' }).goAway(2000)
           setTimeout(() => {
@@ -146,6 +156,9 @@ import Toasted from 'vue-toasted';
         that.socket.on('tabremove', function (tabId) {
           that.removeContainer(tabId, true)
         })
+        that.socket.on('layout', function (name){
+          that.layout=name;
+        });
         that.socket.on('tabrename', function (tabId,name) {
           for (let i = 0; i < that.contentTabs.length; i++) {
             if (that.contentTabs[i].id === tabId) {
@@ -163,9 +176,9 @@ import Toasted from 'vue-toasted';
         that.socket.on('raisehand', function (info) {
           if (raisedHands.hasOwnProperty(info.user.identity)) return
           raisedHands[info.user.identity] = 1
-          let msg=info.user.firstName + ' raised a request!';
-          that.notifications.push({text: msg,time: new Date()})
-          Vue.toasted.info(msg, { position: 'bottom-right',
+          let msg='raised a request!';
+          that.notifications.push({sender:  info.user.firstName, text: msg,time: new Date()})
+          Vue.toasted.info(info.user.firstName +" "+msg, { position: 'bottom-right',
             action: [
               /*{
                 text: 'Chat',
@@ -199,7 +212,7 @@ import Toasted from 'vue-toasted';
         })
         that.socket.on('peer-connect', function (data) {
           data.user.peerId = data.socketId
-          that.notifications.push({text: data.user.firstName + ' is online!',time: new Date()});
+          that.notifications.push({sender: data.user.firstName, text: 'is online!',time: new Date()});
           addParticipants(data.user, false)
           that.allParticipants[data.user.identity]=data.user;
           that.totalParticipants = Object.keys(that.participants).length
@@ -241,7 +254,7 @@ import Toasted from 'vue-toasted';
             }
           })
           if (peerIdentity) {
-            that.notifications.push({text: that.participants[peerIdentity].firstName + ' is offline!',time: new Date()});
+            that.notifications.push({sender: that.participants[peerIdentity].firstName, text: 'is offline!',time: new Date()});
             delete that.participants[peerIdentity]
             delete that.allParticipants[peerIdentity];
           }
@@ -321,7 +334,36 @@ import Toasted from 'vue-toasted';
           that.currentTab=null
           that.socket.emit('dumpbuffer', true);
         });
-
+        that.socket.on('updatepaused', function (tabId, mediaType, type, timestamp){
+          if(mediaType=='youtube-player'){
+            if(typeof YT == "undefined") return;
+            let elem=YT.get(tabId);
+            if(!elem) return;
+            
+            elem.seekTo(timestamp);
+            switch(type){
+              case 'play':
+                elem.playVideo();
+              break;
+              case 'pause':
+                elem.pauseVideo();
+              break;
+            }
+          }else{
+            let elem=document.getElementById(mediaType+"_"+tabId);
+            if(!elem) return;
+          
+            elem.currentTime=timestamp;
+            switch(type){
+              case 'play':
+                elem.play();
+              break;
+              case 'pause':
+                elem.pause();
+              break;
+            }  
+          }
+        })
         if (!bufferDumped) {
           setTimeout(function(){
             that.socket.emit('dumpbuffer')
@@ -365,6 +407,10 @@ import Toasted from 'vue-toasted';
           this.changeContentPage(1);
         }
       },
+      changeLayout: function (e){
+        this.layout=e.target.value;
+        this.socket.emit('layout', e.target.value);
+      },
       chatWith: function (identity) {
         if (identity !== this.loggedInUser.identity) {
           this.$refs.chatBox.chatWith(identity)
@@ -381,9 +427,9 @@ import Toasted from 'vue-toasted';
         that.socket.emit('editorchange_language', lang, tabId)
       },
       handleClick: function (ev) {
-        if (!document.querySelector('.timer-container').contains(ev.target)) {
+        /*if (!document.querySelector('.timer-container').contains(ev.target)) {
           this.showTimer=false
-        }
+        }*/
         if (!document.querySelector('.notification-container').contains(ev.target)) {
           this.showNotifications = false
         }
@@ -446,6 +492,9 @@ import Toasted from 'vue-toasted';
       hideParticipantList: function (index){
         let currentIndex=this.participantList.indexOf(index);
         this.participantList.splice(currentIndex,1);
+      },
+      changeGroupLeader: function (index, identity, peerId) {
+        this.socket.emit('changeleader', index, identity, peerId);
       },
       addParticipants: function (index) {
         let that=this;
@@ -566,6 +615,19 @@ import Toasted from 'vue-toasted';
             if(that.remaining_participants[identity]) delete that.remaining_participants[identity];
           });
         });
+      },
+      updatePausedYT: function (type, e){
+        this.socket.emit('updatepaused',e.target.a.id, 'youtube-player', type, e.target.getCurrentTime());
+      },
+      updatePaused: function (tabId,e){
+        this.socket.emit('updatepaused',tabId, e.target.localName, e.type, e.target.currentTime);
+      },
+      toggleMute: function (mediaId){
+        let elem= document.getElementById(mediaId);
+        if(!elem) return;
+        if(typeof this.speaker[mediaId] == 'undefined') this.speaker[mediaId]=false;
+        this.speaker[mediaId] = !this.speaker[mediaId];
+        elem.muted=!this.speaker[mediaId];
       },
       toggleVideo: function () {
         this.isVidAvailable = !this.isVidAvailable

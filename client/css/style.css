@@ -25,7 +25,7 @@ nav#media-controls{ border-radius: 5px;-webkit-border-radius: 5px;}
   border-radius: 12px 12px 0px 0px;
 }
 /* YT Player */
-iframe.youtube-player,div.code-container .code-editor{ width: 100%; height: 100%;}
+.youtube-player, .youtube-player > iframe,div.code-container .code-editor{ width: 100%; height: 100%;}
 div.code-container select.language-chooser{z-index:99; left: auto !important;}
 .modal-backdrop.show.loader{opacity: 1;}
 .modal-backdrop .loader-container{top: 48%; left: 48%;}
@@ -137,11 +137,11 @@ div.remote-videos video::-webkit-media-controls {
   position: absolute;
   display: none;
   z-index: 1;
-  left: -130px;
+  left: -150px;
   top: 60px;
   min-height: 10px;
   min-width: 10px;
-  width: 280px;
+  width: 350px;
 }
 .dropdown-container .dropdown-menu .dropdown-header {
   background: #FFF;
@@ -162,7 +162,7 @@ div.remote-videos video::-webkit-media-controls {
 .dropdown-container .dropdown-menu .dropdown-header .triangle {
   position: absolute;
   top: -8px;
-  left: 134px;
+  left: 155px;
   height: 15px;
   width: 15px;
   transform: rotate(45deg);
@@ -591,7 +591,7 @@ div.content-nav .disabled{opacity: 0.5;}
 
 /*--stylenew--*/
 .header-cont {
-  background: #eee !important;
+  background: #fff !important;
 }
 .left-sidebar h3 {
     background: #0c6663;
@@ -599,13 +599,101 @@ div.content-nav .disabled{opacity: 0.5;}
     font-size: 22px;
     padding: 6px;
 }
+span.remaining-time {
+    font-size: 26px;
+    font-weight: bold;
+    color: #0c6663;
+    margin-right:12px;
+}
+.remaininghors,.notification-msg
+{
+  color: #0c6663;
+}
+.bottom-bg {
+    background: #0c6663;
+}
 #toggleRecording .active-rec {
 
     color: #dc3545 !important;
     border: 2px solid;
     border-radius: 31px;
     font-size: 14px;
+    padding: 3px;
 
+}
+.text-greenish
+{
+  color:#0c6663;
+
+}
+.text-greenish.inactive{
+  color: #B2CECF;
+}
+.classroom-popups .modal-header {
+    background: #006666;
+    
+}
+.leadactions th {
+    color: #006666;
+}
+.signoutcolor i.fas.fa-sign-out-alt {
+    color: #006666;
+}
+
+.cancel
+{
+color: #fff;
+background:#999999;
+}
+
+.namelistcontact a {
+    color: #418985;
+    text-decoration: none;
+    background-color: transparent;
+    }
+
+td.roomlist {
+    color: #009999;
+}
+.add-list a {
+    color: #0c6663;
+    margin-top: 8px;
+    float: left;
+}
+span.fa.fa-plus-circle {
+    color: #;
+}
+.classroom-popups .close {
+    float: right;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 1px 0 #fff;
+    opacity: 9;
+}
+.classroom-popups .btn-secondary {
+    color: #fff;
+    
+    border-color: #0c6663;
+    background: linear-gradient(to right, #0c6663, #3fbab6);
+}
+.classroom-popups .modal-title {
+    margin-bottom: 0;
+    line-height: 1.5;
+    color: #FFFF;
+}
+.course-title {
+    font-weight: bold;
+    color: #006666;
+}
+span.breakout-name {
+    color: #FFF;
+    font-size: 21px;
+}
+select.slecct-menu {
+    padding: 11px;
+    margin: 0 0px 0 67px;
 }
 
 .header-cont .my-0.mr-md-auto.font-weight-normal {
@@ -694,16 +782,20 @@ border-radius: .25rem;
 .tool-brush{ background-image: url('../img/brush.png') }
 .tool-circle{ background-image: url('../img/circal.png') }
 .tool-colorpicker{ background-image: url('../img/colorpicker.png') }
-.tool-eraser{ background-image: url('../img/eraser.png') }JaiPal Rana
+.tool-eraser{ background-image: url('../img/eraser.png') }
 .tool-grab{ background-image: url('../img/grab.png') }
 .tool-pen{ background-image: url('../img/pentool.png') }
 .tool-rectangle{ background-image: url('../img/rectangle.png') }
 .tool-text{ background-image: url('../img/texticon.png') }
 .tool-triangle{ background-image: url('../img/trigle.png') }
 .tool-undo{ background-image: url('../img/undodrawing.png') }
+
 .control-container.controls-top .control-button, .control-container.controls-top .control-integer .control-button{padding: 2px;}
 .control-container.controls-left .control-button{padding: 6px 2px;}
-
+.container-group .control-group{width: 600px; top: 0px; left: 37px;}
+.control-container.controls-left .container-group > .control-button i.tool-item,.tool-select{font-size: 24px;}
+.control-container.controls-left .container-group .control-group .control-button{width: 44px; display: inline;border-top: 1px solid black;border-bottom: 1px solid black;}
+.control-container.controls-left .container-group .control-group .control-button:last-child{border-radius: 0px 5px 5px 0px !important;border-right: 1px solid black;}
 .fa-4{font-size: 4em;}
 .theme-color{color: #900000;}
 .content-item >a >i.fa-file-pdf,.content-item >a >img{height: 100px;}
@@ -713,5 +805,47 @@ border-radius: .25rem;
 .content-item > a.folder-edit{left: 80px;}
 .content-item:hover > a.folder-edit, .content-item:hover > a.folder-delete{display: block;}
 .no-edit #play-menu,.no-edit .language-chooser,.no-edit .white-board .control-container, .content-tabs .overlay{display:none;}
-.no-edit .content-tabs .overlay{display: block;}
+.no-edit .content-tabs .overlay{display: block; top: 0px;}
 .content-tabs .overlay{width: 100%; height: 100%;}
+.content-tabs .toggle-mute{bottom: 0px; right: 20px; font-size: 2em; cursor: pointer;z-index: 999;}
+/* classroom view*/
+.classroom-view  .right-sidebar .webcam-container .remote-videos{display: none;} 
+/* conference view*/
+.conference-view .left-sidebar {
+    display: none;
+}
+.conference-view .right-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 100%;
+    border-top: 0px solid black !important;
+}
+.conference-view .right-sidebar .webcam-container {
+    width: 75%;
+    float: left;
+    border: 0px solid black;
+}
+.conference-view .right-sidebar .webcam-container #video-container > video, .conference-view .right-sidebar .webcam-container #video-container > img{
+  width: 40%;
+  margin: 0 auto;
+}
+.conference-view .right-sidebar .chat-container {
+    width: 20%;
+    float: right;
+}
+.conference-view .right-sidebar .chat-container .chat-list {
+    height: 400px !important;
+}
+.conference-view .right-sidebar .webcam-container .card-header {
+    display: none;
+}
+.conference-view .right-sidebar .webcam-container .remote-videos video {
+    max-width: 300px;
+}
+.notification-msg {
+    font-style: italic;
+}
+
+.notification-person {
+    color: #6d6c6c;
+}

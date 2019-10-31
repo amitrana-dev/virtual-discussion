@@ -92,6 +92,17 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
       socket.on('message', function (data,peerId) {
           socket.broadcast.to(peerId).emit('message', data,socket.id);
       });
+      socket.on('changeleader', function (index, identity){
+        REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
+          if(!breakouts){
+            return;
+          }
+          breakouts=JSON.parse(breakouts);
+          breakouts[index].groupLeader=identity;
+          REDIS.hset('breakouts', originalDiscussionId, JSON.stringify(breakouts) ,_=>{});
+          socket.to(originalDiscussionId + '-'+index.toString()).emit('changeleader',identity);
+        });
+      });
       socket.on('addparticipant', function (index, identity, socketId){
         REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
           if(!breakouts){
@@ -112,8 +123,6 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
           breakouts=JSON.parse(breakouts);
           if(breakouts[index].groupLeader == identity) breakouts[index].groupLeader= breakouts[index].participants.length ? breakouts[index].participants[0] : null;
           breakouts[index].participants.splice(breakouts[index].participants.indexOf(identity),1);
-          console.log('deleting ',identity);
-          console.log(breakouts[index].participants);
           REDIS.hset('breakouts', originalDiscussionId, JSON.stringify(breakouts) ,_=>{})  
           socket.broadcast.to(socketId).emit('reconnect');  
         });
