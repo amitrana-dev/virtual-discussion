@@ -137,6 +137,57 @@ var Whiteboard = function () {
         }
       })
     });
+    socket.on('removedrawing', function (event, tabId, typeOfBoard, pageId) {
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('removedrawing ' + discussionId) }
+      socket.to(discussionId).emit('removedrawing', tabId, typeOfBoard, pageId, event.index);
+      redis.hget('workplace', discussionId, (err, workplace) => {
+        if (err && CONFIG.DEBUG) console.warn(err)
+        if (workplace) {
+          workplace=initWorkPlace(workplace, tabId, typeOfBoard, pageId);
+          if(typeOfBoard === 'content'){
+            workplace['content'][tabId]['pages'][pageId]['drawings'].splice(event.index, 1);  
+          }else{
+            workplace['whiteboard'][tabId]['drawings'].splice(event.index,1);
+          }
+          redis.hset('workplace', discussionId, JSON.stringify(workplace))
+        }
+      })
+    });
+    socket.on('rotate', function (event, tabId, typeOfBoard, pageId) {
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('rotate ' + discussionId) }
+      socket.to(discussionId).emit('rotate', event, tabId, typeOfBoard, pageId);
+      redis.hget('workplace', discussionId, (err, workplace) => {
+        if (err && CONFIG.DEBUG) console.warn(err)
+        if (workplace) {
+          workplace=initWorkPlace(workplace, tabId, typeOfBoard, pageId);
+          if(typeOfBoard === 'content'){
+            workplace['content'][tabId]['pages'][pageId]['drawings'][event.index]['rotate']=event.rotate;  
+          }else{
+            workplace['whiteboard'][tabId]['drawings'][event.index]['rotate']=event.rotate;
+          }
+          redis.hset('workplace', discussionId, JSON.stringify(workplace))
+        }
+      })
+    });
+    socket.on('resize', function (event, tabId, typeOfBoard, pageId) {
+      let discussionId = mapSocketToDiscussion[socket.id]
+      if (CONFIG.DEBUG) { console.log('resize ' + discussionId) }
+      socket.to(discussionId).emit('resize', event, tabId, typeOfBoard, pageId);
+      redis.hget('workplace', discussionId, (err, workplace) => {
+        if (err && CONFIG.DEBUG) console.warn(err)
+        if (workplace) {
+          workplace=initWorkPlace(workplace, tabId, typeOfBoard, pageId);
+          if(typeOfBoard === 'content'){
+            workplace['content'][tabId]['pages'][pageId]['drawings'][event.index]=event.drawing;  
+          }else{
+            workplace['whiteboard'][tabId]['drawings'][event.index]=event.drawing;
+          }
+          redis.hset('workplace', discussionId, JSON.stringify(workplace))
+        }
+      })
+    });
 
   }
   return {

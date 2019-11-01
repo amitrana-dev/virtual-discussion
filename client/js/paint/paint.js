@@ -9,8 +9,8 @@ module.exports=(...args)=>{
 		  this.controlContainerLeft = container.appendChild(document.createElement("div"));
 			this.controlContainerLeft.className = "control-container controls-left";
 			
-			this.controlContainerTop = container.appendChild(document.createElement("div"));
-			this.controlContainerTop.className = "control-container controls-top";
+			this.controlContainerBottom = container.appendChild(document.createElement("div"));
+			this.controlContainerBottom.className = "control-container controls-bottom";
 			
 			this.buildControls();
 		}
@@ -22,8 +22,8 @@ module.exports=(...args)=>{
 			while (this.controlContainerLeft.firstChild) {
 				this.controlContainerLeft.removeChild(this.controlContainerLeft.firstChild);
 			}
-			while (this.controlContainerTop.firstChild) {
-				this.controlContainerTop.removeChild(this.controlContainerTop.firstChild);
+			while (this.controlContainerBottom.firstChild) {
+				this.controlContainerBottom.removeChild(this.controlContainerBottom.firstChild);
 			}
 
 			// Create each controler from its definition
@@ -34,8 +34,8 @@ module.exports=(...args)=>{
 					case 'left':
 						this.controlContainerLeft.appendChild(control.containerAppend);
 					break;
-					case 'top':
-						this.controlContainerTop.appendChild(control.containerAppend);
+					case 'bottom':
+						this.controlContainerBottom.appendChild(control.containerAppend);
 					default:
 						if(this.controlContainerLeft.querySelector('.container-'+this.controls[cKey].place)) this.controlContainerLeft.querySelector('.container-'+this.controls[cKey].place).appendChild(control.containerAppend);
 					break;
@@ -111,7 +111,7 @@ module.exports=(...args)=>{
 
 		Controls.prototype.constructors.integer = function createIntegerInput (control) {
 			var container = document.createElement("div");
-			container.className = (control.classAppend || "") + "control-integer";
+			container.className = (control.classAppend || "") + "control-integer w-auto";
 
 			var groupContainer=document.createElement("div");
 			groupContainer.className = "input-group";
@@ -121,8 +121,10 @@ module.exports=(...args)=>{
 			var input = document.createElement("input");
 			input.type = control.range ? "range" : "number";
 			input.value = control.value;
-			input.className = (control.classAppend || "") + "form-control custom-range h-auto pl-1 pr-1 bg-white";
-
+			input.className = (control.classAppend || "") + "form-control custom-range h-auto pl-1 mr-2 bg-white rounded-0";
+			if(!control.range){
+				input.style="width: 60px;";	
+			}
 			if (control.text)
 				input.placeholder = control.text;
 
@@ -148,44 +150,63 @@ module.exports=(...args)=>{
 				control.action(input.value, true);
 			});
 
-			var prependContainer=document.createElement('div');
-			prependContainer.className='input-group-prepend';
-			// Create the minus button
-			var minusButton = groupContainer.appendChild(prependContainer.appendChild(this.button({
-				html: "i",
-				elemClass: 'fa fa-minus',
-				action: function () {
-					var max = parseInt(input.max || Infinity);
-					var nextValue = parseInt(input.value) - 1;
-					input.value = Math.min(max, nextValue);
-					control.action(input.value, true);
-				}
-			}).containerAppend));
-
+			if(control.range){
+				var prependContainer=document.createElement('div');
+				prependContainer.className='input-group-prepend';
+				// Create the minus button
+				var minusButton = groupContainer.appendChild(prependContainer.appendChild(this.button({
+					html: "i",
+					elemClass: 'fa fa-minus',
+					action: function () {
+						var max = parseInt(input.max || Infinity);
+						var nextValue = parseInt(input.value) - 1;
+						input.value = Math.min(max, nextValue);
+						control.action(input.value, true);
+					}
+				}).containerAppend));
+			}
 			// Append the input
 			groupContainer.appendChild(input);
+	
+			if(control.range){
+				var appendContainer=document.createElement('div');
+				appendContainer.className='input-group-append';
 
-			var appendContainer=document.createElement('div');
-			appendContainer.className='input-group-append';
-
-			// Create a plus button
-			groupContainer.appendChild(appendContainer.appendChild(this.button({
-				html: "i",
-				elemClass: 'fa fa-plus',
-				action: function () {
-					var max = parseInt(input.max || Infinity);
-					var nextValue = parseInt(input.value) + 1;
-					input.value = Math.min(max, nextValue);
-					control.action(input.value, true);
-				}
-			}).containerAppend));
-
-			container.appendChild(groupContainer);
+				// Create a plus button
+				groupContainer.appendChild(appendContainer.appendChild(this.button({
+					html: "i",
+					elemClass: 'fa fa-plus',
+					action: function () {
+						var max = parseInt(input.max || Infinity);
+						var nextValue = parseInt(input.value) + 1;
+						input.value = Math.min(max, nextValue);
+						control.action(input.value, true);
+					}
+				}).containerAppend));
+			}
+				container.appendChild(groupContainer);
 
 			return {
 				input: input,
 				//integerOutput: integerOutput,
 				containerAppend: container
+			}
+		};
+		Controls.prototype.constructors.html = function createHtml (control) {
+			// Create the actual input field
+			var input = document.createElement("div");
+			input.innerHTML = control.value;
+			input.className = (control.classAppend || "")+" control-button btn rounded-0 btn-sm";
+
+			if (control.title)
+				input.title = control.title;
+
+			if (control.data)
+				for (var datakey in control.data)
+					input.setAttribute("data-" + datakey, control.data[datakey]);
+			return {
+				input: input,
+				containerAppend: input
 			}
 		};
 		Controls.prototype.constructors.group = function createGroup (control) {
@@ -260,6 +281,8 @@ module.exports=(...args)=>{
 				containerAppend: input,
 				executeAfterAppend: function () {
 					var spectrum = $(input).spectrum({
+						className: control.name,
+						title: control.title,
 						showAlpha: true,
 						showInput: true,
 						showInitial: true,
@@ -3274,7 +3297,7 @@ module.exports=(...args)=>{
 		        return colorInput.type === "color" && colorInput.value !== "!";
 		    })(),
 		    replaceInput = [
-		        "<div class='control-button'>",
+		        "<div class='control-button btn rounded-0 btn-sm'>",
 		            "<i class='tool-item tool-colorpicker sp-preview-inner'></i>",
 		        "</div>"
 		    ].join(''),
@@ -3404,7 +3427,7 @@ module.exports=(...args)=>{
 		            maxSelectionSize = opts.maxSelectionSize,
 		            draggingClass = "sp-dragging",
 		            shiftMovementDirection = null;
-
+		            
 		        var doc = element.ownerDocument,
 		            body = doc.body,
 		            boundElement = $(element),
@@ -3428,7 +3451,7 @@ module.exports=(...args)=>{
 		            isInput = boundElement.is("input"),
 		            isInputTypeColor = isInput && inputTypeColorSupport && boundElement.attr("type") === "color",
 		            shouldReplace = isInput && !flat,
-		            replacer = (shouldReplace) ? $(replaceInput).addClass(theme).addClass(opts.className).addClass(opts.replacerClassName) : $([]),
+		            replacer = (shouldReplace) ? $(replaceInput).addClass(theme).addClass(opts.className).addClass(opts.replacerClassName).attr("title",opts.title) : $([]),
 		            offsetElement = (shouldReplace) ? replacer : boundElement,
 		            previewElement = replacer.find(".sp-preview-inner"),
 		            initialColor = opts.color || (isInput && boundElement.val()),
@@ -3935,10 +3958,18 @@ module.exports=(...args)=>{
 		            var realColor = get({ format: format }),
 		                displayColor = '';
 
+		            var parentpreviewElem=previewElement.parent();
+		            
 		             //reset background info for preview element
 		            previewElement.removeClass("sp-clear-display");
-		            previewElement.css('color', 'black');
-
+		            if(parentpreviewElem.hasClass('tool-color')){
+		            	previewElement.css('background-color', 'black');
+		            }else if(parentpreviewElem.hasClass('tool-strokecolor')){
+		            	previewElement.css('border', '3px solid black');
+		            }else{
+		            	previewElement.css('color', 'black');
+		            }
+		            
 		            if (!realColor && allowEmpty) {
 		                // Update the replaced elements background with icon indicating no color selection
 		                previewElement.addClass("sp-clear-display");
@@ -3949,10 +3980,22 @@ module.exports=(...args)=>{
 
 		                // Update the replaced elements background color (with actual selected color)
 		                if (rgbaSupport || realColor.alpha === 1) {
-		                    previewElement.css("color", realRgb);
+		                    if(parentpreviewElem.hasClass('tool-color')){
+						            	previewElement.css('background-color', realRgb);
+						            }else if(parentpreviewElem.hasClass('tool-strokecolor')){
+						            	previewElement.css('border', '3px solid '+realRgb);
+						            }else{
+						            	previewElement.css('color', realRgb);
+						            }
 		                }
 		                else {
-		                    previewElement.css("color", "black");
+		                    if(parentpreviewElem.hasClass('tool-color')){
+						            	previewElement.css('background-color', 'black');
+						            }else if(parentpreviewElem.hasClass('tool-strokecolor')){
+						            	previewElement.css('border', '3px solid black');
+						            }else{
+						            	previewElement.css('color', 'black');
+						            }
 		                    previewElement.css("filter", realColor.toFilter());
 		                }
 
@@ -6180,6 +6223,11 @@ module.exports=(...args)=>{
 				this.localDrawings[this.selectedDrawingIndex].rotate=angle;
 				this.redrawLocals();
 				this.drawSelection(angle);
+				this.dispatchEvent({
+					type: "rotate",
+					rotate: angle,
+					index: this.selectedDrawingIndex
+				});
 			}
 		};
 		Paint.prototype.resizeDrawing = function resizeDrawing(change,newCords){
@@ -6198,16 +6246,28 @@ module.exports=(...args)=>{
 						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+change;
 					break;
 					case 'arrow':
-						this.localDrawings[this.selectedDrawingIndex].x1=newCords[0];
-						this.localDrawings[this.selectedDrawingIndex].y1=newCords[1];
+						this.localDrawings[this.selectedDrawingIndex].x1=Math.round((this.local.leftTopX + (newCords[0] / this.local.zoom)) * this.PATH_PRECISION) / this.PATH_PRECISION;
+						this.localDrawings[this.selectedDrawingIndex].y1=Math.round((this.local.leftTopY + (newCords[1] / this.local.zoom)) * this.PATH_PRECISION) / this.PATH_PRECISION;
 					break;
 					case 'line':
-						this.localDrawings[this.selectedDrawingIndex].x1=newCords[0];
-						this.localDrawings[this.selectedDrawingIndex].y1=newCords[1];
+						this.localDrawings[this.selectedDrawingIndex].x1=Math.round((this.local.leftTopX + (newCords[0] / this.local.zoom)) * this.PATH_PRECISION) / this.PATH_PRECISION;
+						this.localDrawings[this.selectedDrawingIndex].y1=Math.round((this.local.leftTopY + (newCords[1] / this.local.zoom)) * this.PATH_PRECISION) / this.PATH_PRECISION;
+					break;
+					case 'text':
+						this.localDrawings[this.selectedDrawingIndex].size=this.initialDrawingCords.size+(change/10);
 					break;
 				}
 				this.redrawLocals();
-				this.drawSelection(0);	
+				this.drawSelection(0);
+				let tempDrawing=Object.assign({},this.localDrawings[this.selectedDrawingIndex]);
+				tempDrawing.color=drawing.color.toRgbString();
+				if(drawing.stroke_color) tempDrawing.stroke_color=drawing.stroke_color.toRgbString();
+				
+				this.dispatchEvent({
+					type: "resize",
+					drawing: tempDrawing,
+					index: this.selectedDrawingIndex
+				});	
 			}
 		};
 		Paint.prototype.drawSelection = function drawSelection (angle){
@@ -7109,11 +7169,18 @@ module.exports=(...args)=>{
 				context.closePath();
 		  }
 		};
-		Paint.prototype.removeDrawing = function removeDrawing (selectedIndex){
+		Paint.prototype.removeDrawing = function removeDrawing (selectedIndex, dontTriggerEvent){
 			if(this.localDrawings[selectedIndex]){
 				this.localDrawings.splice(selectedIndex,1);
 				this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
 				this.redrawLocals();
+				this.hideDrawingControls();
+				
+				if(!dontTriggerEvent)
+				this.dispatchEvent({
+					type: "removedrawing",
+					index: selectedIndex
+				});
 			}
 		};
 		Paint.prototype.addDrawing = function addDrawing (drawing) {
@@ -7413,8 +7480,8 @@ module.exports=(...args)=>{
 				name: "grab",
 				type: "button",
 				html: "i",
-				place: "top",
-				elemClass: "tool-item tool-grab",
+				place: "bottom",
+				elemClass: "tool-item fa fa-hand-paper",
 				title: "Change tool to grab",
 				value: "grab",
 				action: this.changeTool.bind(this)
@@ -7535,15 +7602,7 @@ module.exports=(...args)=>{
 				title: "Change tool to picker",
 				value: "picker",
 				action: this.changeTool.bind(this)
-			}, */{
-				name: "undo",
-				type: "button",
-				html: "i",
-				place: "left",
-				elemClass: "tool-item tool-undo",
-				title: "Undo drawing",
-				action: this.undo.bind(this)
-			},/*{
+			}, *//*{
 				name: "select",
 				type: "button",
 				html: "i",
@@ -7558,46 +7617,84 @@ module.exports=(...args)=>{
 				title: "Change tool to block",
 				value: "block",
 				action: this.changeTool.bind(this)
-			},*/ {
-				name: "tool-size",
-				place: "top",
-				type: "integer",
-				range: true,
-				text: "Tool size",
-				min: 1,
-				max: this.defaultSettings.maxSize,
-				value: 5,
-				title: "Change the size of the tool",
-				action: this.changeToolSize.bind(this)
-			}, {
-				name: "zoom-in",
-				type: "button",
-				html: "i",
-				place: "top",
-				elemClass: "fas fa-search-plus",
-				title: "Drag tool to zoom in/out",
-				value: 1.2,
-				action: this.zoom.bind(this)
-			}, {
-				name: "zoom-out",
-				place: "top",
-				type: "button",
-				html: "i",
-				elemClass: "fas fa-search-minus",
-				title: "Reset zoom",
-				value: 1 / 1.2,
-				action: this.zoom.bind(this)
-			},{
+			},*/
+			 {
 				name: "tool-strokesize",
-				place: "top",
+				type: "group",
+				html: "i",
+				place: "left",
+				elemClass: "tool-item fa fa-pencil-alt",
+				title: "Select stroke size",
+				value: "strokesize",
+				action: _=>{}
+			},
+			 {
+				name: "tool-line",
+				place: "strokesize",
+				type: "html",
+				text: "Stroke size",
+				value: '<span class="tool-item align-middle d-table-cell"><hr class="border-dark m-0" style="border-width: 4px;"/></span>',
+				action: _=>{}
+			},
+			{
+				name: "tool-strokesize",
+				place: "strokesize",
 				type: "integer",
-				range: true,
+				range: false,
 				text: "Tool stroke size",
 				min: 1,
 				max: this.defaultSettings.maxSize,
 				value: 5,
 				title: "Change the stroke size of the tool",
 				action: this.changeStrokeSize.bind(this)
+			},
+			{
+				name: "tool-size",
+				type: "group",
+				html: "i",
+				place: "left",
+				elemClass: "tool-item fa fa-pen",
+				title: "Select tool size",
+				value: "toolsize",
+				action: _=>{}
+			},
+			 {
+				name: "tool-fillcircle",
+				place: "toolsize",
+				type: "html",
+				text: "Stroke size",
+				value: '<span class="tool-item fa fa-circle"></span>',
+				action: _=>{}
+			}, 
+			 {
+				name: "tool-size",
+				place: "toolsize",
+				type: "integer",
+				range: false,
+				text: "Tool size",
+				min: 1,
+				max: this.defaultSettings.maxSize,
+				value: 5,
+				title: "Change the tool size",
+				action: this.changeToolSize.bind(this)
+			}, {
+				name: "zoom-in",
+				type: "button",
+				html: "i",
+				place: "bottom",
+				elemClass: "tool-item fas fa-search-plus",
+				title: "Drag tool to zoom in/out",
+				value: 1.2,
+				action: this.zoom.bind(this)
+			}, {
+				name: "zoom-out",
+				place: "bottom",
+				type: "button",
+				html: "i",
+				elemClass: "tool-item fas fa-search-minus",
+				title: "Reset zoom",
+				value: 1 / 1.2,
+				action: this.zoom.bind(this)
 			},
 			/* {
 				name: "zoom-in",
@@ -7620,7 +7717,7 @@ module.exports=(...args)=>{
 				type: "color",
 				text: "Tool color",
 				value: "#FFFFFF",
-				place: "left",
+				place: "bottom",
 				title: "Change the color of the tool",
 				action: this._changeColor.bind(this)
 			}, {
@@ -7628,14 +7725,14 @@ module.exports=(...args)=>{
 				type: "color",
 				text: "Tool stroke color",
 				value: "#FFFFFF",
-				place: "left",
+				place: "bottom",
 				title: "Change the stroke color of the tool",
 				action: this._changeStrokeColor.bind(this)
 			}, {
 				name: "eqeditor",
 				type: "button",
 				html: "i",
-				elemClass: "fas fa-square-root-alt",
+				elemClass: "tool-item fas fa-subscript",
 				place: "left",
 				value: 'eqeditor',
 				title: "Add mathematical equation to the workspace",
@@ -7644,17 +7741,25 @@ module.exports=(...args)=>{
 				name: "tool-grid",
 				type: "button",
 				html: "i",
-				elemClass: "fas fa-th",
+				elemClass: "tool-item fas fa-th",
 				value: "true",
-				place: "top",
+				place: "left",
 				title: "Toggle Grid",
 				action: this.showGrid.bind(this)
 			}, {
+				name: "undo",
+				type: "button",
+				html: "i",
+				place: "bottom",
+				elemClass: "tool-item fa fa-undo-alt",
+				title: "Undo drawing",
+				action: this.undo.bind(this)
+			},{
 				name: "tool-clear",
 				type: "button",
 				html: "i",
-				elemClass: "fa fa-sync",
-				place: "top",
+				elemClass: "tool-item fa fa-trash",
+				place: "left",
 				title: "Clear Workspace",
 				action: this.clearWorkspace.bind(this)
 			}/*, {
@@ -7972,12 +8077,12 @@ module.exports=(...args)=>{
 				// Get the coordinates relative to the canvas
 				var targetCoords = paint.getCoords(event);
 				var scaledCoords = paint.scaledCoords(targetCoords, event);
+				
 				// Is rotating or resizing?
 				if (event.type == "mousemove" && typeof paint.selectedDrawingIndex !='undefined' && (paint.isResizing || paint.isRotating)) {
 					if(paint.isResizing){
 						let change=Math.max(event.clientX - paint.initialCords.clientX,event.clientY - paint.initialCords.clientY);
-						console.log('resizing',change);
-				    paint.resizeDrawing(change,scaledCoords);
+					  paint.resizeDrawing(change,scaledCoords);
 				    return;
 					}
 					if(paint.isRotating){
@@ -8012,7 +8117,7 @@ module.exports=(...args)=>{
 						var keepSearching=true;
 						paint.rectanglePoints=[];
 						var drawing={},scaledDrawing={};
-						let minX,maxX,minY,maxY,minScaledX,maxScaledX,minScaledY,maxScaledY,diffX,diffY;
+						let minX,maxX,minY,maxY,minScaledX,maxScaledX,minScaledY,maxScaledY,diffX,diffY,hiddenContext,textWidth;
 						for(var i=paint.localDrawings.length; i >0 ; i--){
 							delete paint.selectedDrawingIndex;
 							drawing=Object.assign({},paint.localDrawings[i-1]);
@@ -8098,6 +8203,27 @@ module.exports=(...args)=>{
   									]
 									}
 								break;
+								case 'text':
+									let hiddenContext = document.createElement("canvas").getContext("2d");
+									hiddenContext.font = drawing.size + "pt Verdana, Geneva, sans-serif";
+									let textWidth = hiddenContext.measureText(drawing.text).width;
+									
+									minScaledX=scaledDrawing.x;
+									minScaledY=scaledDrawing.y;
+									maxScaledX=scaledDrawing.x+textWidth-10;
+									maxScaledY=scaledDrawing.y;
+									
+									if(drawing.x - 10 <= scaledLastSelectCoords[0] && scaledLastSelectCoords[0] <= drawing.x + textWidth + 10 && drawing.y - drawing.size -10 <= scaledLastSelectCoords[1] && scaledLastSelectCoords[1] <= drawing.y + 10){
+										paint.selectedDrawingIndex=i-1;
+  									keepSearching=false;
+  									paint.rectanglePoints=[
+  										[minScaledX - 10, maxScaledY + 10],
+											[maxScaledX, maxScaledY + 10],
+											[maxScaledX, minScaledY - drawing.size],
+											[minScaledX - 10, minScaledY - drawing.size]
+  									]
+									}
+								break;
 								case 'triangle':
 									var point=[scaledLastSelectCoords[0],scaledLastSelectCoords[1]],
 									triangle=[
@@ -8136,7 +8262,6 @@ module.exports=(...args)=>{
 							}
 							if(!keepSearching) break;
 						}
-						console.log('selectedIndex',paint.selectedDrawingIndex);
 						if(typeof paint.selectedDrawingIndex !== 'undefined'){
 							paint.drawSelection(0);
 						}
@@ -8149,7 +8274,6 @@ module.exports=(...args)=>{
 					// How much should the drawings be moved
 					var relativeMotionX = paint.lastSelectCoords[0] - scaledCoords[0],
 					    relativeMotionY = paint.lastSelectCoords[1] - scaledCoords[1];
-					console.log(event.type,relativeMotionX,relativeMotionY);
 					paint.localDrawings[paint.selectedDrawingIndex].x=paint.localDrawings[paint.selectedDrawingIndex].x-relativeMotionX;
 					paint.localDrawings[paint.selectedDrawingIndex].x1=paint.localDrawings[paint.selectedDrawingIndex].x1-relativeMotionX;
 					paint.localDrawings[paint.selectedDrawingIndex].y=paint.localDrawings[paint.selectedDrawingIndex].y-relativeMotionY;
@@ -9126,9 +9250,16 @@ module.exports=(...args)=>{
 				}
 			},
 			line: function (context, drawing, tiledCanvas) {
+				context.save();
 				context.beginPath();
 				context.globalCompositeOperation="source-over";
-				
+				let midX=(drawing.x + drawing.x1)/2;
+				let midY=(drawing.y + this.FIX_CANVAS_PIXEL_SIZE + drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE ) / 2;
+				if(drawing.rotate){
+					context.translate(midX ,midY);
+					context.rotate(drawing.rotate);
+					context.translate(-midX,-midY);
+				}
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
 				
@@ -9138,19 +9269,30 @@ module.exports=(...args)=>{
 				context.lineCap = "round";
 
 				context.stroke();
+				context.closePath();
+				context.restore();
 				
 				if (tiledCanvas) {
-					tiledCanvas.drawingRegion(drawing.x, drawing.y, drawing.x1, drawing.y1, drawing.size);
+					let diff=Math.max(Math.abs(drawing.x - drawing.x1),Math.abs(drawing.y - drawing.y1));
+					tiledCanvas.drawingRegion(midX - diff/2, midY - diff/2, midX + diff/2, midY + diff/2, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
 			},
 			arrow: function (context, drawing, tiledCanvas) {
 				var headlen = 10;
         var angle = Math.atan2(drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE-drawing.y,drawing.x1-drawing.x);
-
+        context.save();
 				context.beginPath();
 				context.globalCompositeOperation="source-over";
 				
+				let centerX=(drawing.x + drawing.x1)/2;
+				let centerY=(drawing.y + this.FIX_CANVAS_PIXEL_SIZE + drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE ) / 2;
+				let maxLength=Math.max(Math.abs(drawing.x1-drawing.x),Math.abs(drawing.y1-drawing.y));
+				if(drawing.rotate){
+					context.translate(centerX ,centerY);
+					context.rotate(drawing.rotate);
+					context.translate(-centerX,-centerY);
+				}
 				context.strokeStyle = drawing.color.toRgbString();
 				context.lineWidth = drawing.size;
 				context.lineCap = "round";
@@ -9159,9 +9301,7 @@ module.exports=(...args)=>{
 				context.lineTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
 				
 				context.stroke();
-				
-				context.beginPath();
-        context.globalCompositeOperation="source-over";
+
 				context.moveTo(drawing.x1, drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE);
         context.lineTo(drawing.x1-headlen*Math.cos(angle-Math.PI/7),drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE -headlen*Math.sin(angle-Math.PI/7));
 
@@ -9178,13 +9318,15 @@ module.exports=(...args)=>{
         context.stroke();
         context.fillStyle = drawing.color.toRgbString();
         context.fill();
-
+        context.closePath();
+				context.restore();
 				if (tiledCanvas) {
-					tiledCanvas.drawingRegion(drawing.x -10 -drawing.size , drawing.y -10 -drawing.size, drawing.x1+10+drawing.size, drawing.y1+10+drawing.size, drawing.size);
+					tiledCanvas.drawingRegion(centerX-maxLength , centerY-maxLength, centerX+maxLength, centerY+maxLength, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
 			},
 			triangle: function (context, drawing, tiledCanvas) {
+				context.save();
 				context.beginPath();
 				context.globalCompositeOperation="source-over";
 				if(drawing.rotate){
@@ -9199,9 +9341,11 @@ module.exports=(...args)=>{
 				context.fillStyle = drawing.color.toRgbString();
 				context.lineWidth = drawing.stroke_size;
 				
-				context.closePath();
 				context.stroke();
 				context.fill();
+				
+				context.closePath();
+				context.restore();
 				
 				if (tiledCanvas) {
 					var topLeftX=Math.min(drawing.x,drawing.x1);
@@ -9402,20 +9546,30 @@ module.exports=(...args)=>{
 				this.drawPath(drawing, context, tiledCanvas);
 			},
 			text: function (context, drawing, tiledCanvas) {
+				// Context can't be used because it's a tiledCanvas context
+				// and that doesnt have a meastureText function that actually returns
+				// valid data, so we need to create a hidden context
+				var hiddenContext = document.createElement("canvas").getContext("2d");
+				hiddenContext.font = drawing.size + "pt Verdana, Geneva, sans-serif";
+				var textWidth = hiddenContext.measureText(drawing.text).width;
+
+				context.save();
+				context.beginPath();
 				context.globalCompositeOperation="source-over";
+				if(drawing.rotate){
+					context.translate(drawing.x + textWidth/2 ,drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
+					context.rotate(drawing.rotate);
+					context.translate(-(drawing.x + textWidth/2) ,-(drawing.y + this.FIX_CANVAS_PIXEL_SIZE));
+				}
 				context.font = drawing.size + "px Verdana, Geneva, sans-serif";
 				context.fillStyle = drawing.color.toRgbString();
 
 				context.fillText(drawing.text, drawing.x, drawing.y);
-
+				context.closePath();
+				context.restore();
+				
 				if (tiledCanvas) {
-					// Context can't be used because it's a tiledCanvas context
-					// and that doesnt have a meastureText function that actually returns
-					// valid data, so we need to create a hidden context
-					var hiddenContext = document.createElement("canvas").getContext("2d");
-					hiddenContext.font = drawing.size + "pt Verdana, Geneva, sans-serif";
-					var textWidth = hiddenContext.measureText(drawing.text).width;
-
+					
 					tiledCanvas.drawingRegion(drawing.x, drawing.y - drawing.size, drawing.x + textWidth, drawing.y, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}

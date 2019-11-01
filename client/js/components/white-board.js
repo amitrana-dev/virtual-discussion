@@ -96,6 +96,32 @@ module.exports={
           }
           that.paint.undo(true);
         })
+        that.socket.on('removedrawing',function (tabId, typeOfBoard, pageId, index) {
+          if (tabId !== that.item.id) return
+          if(typeOfBoard === 'content'){
+            that.item.content[pageId].drawings.splice(index,1);
+          }
+          that.paint.removeDrawing(index,true);
+        })
+        that.socket.on('rotate',function (event, tabId, typeOfBoard, pageId) {
+          if (tabId !== that.item.id) return
+          if(typeOfBoard === 'content'){
+            that.item.content[pageId].drawings[event.index].rotate=event.rotate;
+          }
+          that.paint.localDrawings[event.index].rotate=event.rotate;
+          that.paint.redrawLocals();
+        })
+        that.socket.on('resize',function (event, tabId, typeOfBoard, pageId) {
+          if (tabId !== that.item.id) return
+          if(typeOfBoard === 'content'){
+            that.item.content[pageId].drawings[event.index]=event.drawing;
+          }
+          event.drawing.color=tinycolor(event.drawing.color);
+          if(event.drawing.stroke_color) event.drawing.stroke_color=tinycolor(event.drawing.stroke_color);
+          
+          that.paint.localDrawings[event.index]=event.drawing;
+          that.paint.redrawLocals();
+        })
         that.socket.on('clearWorkspace',function (tabId, typeOfBoard, pageId) {
           if (tabId !== that.item.id) return
           if(typeOfBoard === 'content'){
@@ -179,6 +205,30 @@ module.exports={
           that.socket.emit('undo',that.item.id,'content',currentPage.id);  
         }else{
           that.socket.emit('undo',that.item.id, 'whiteboard');
+        }
+      });
+      that.paint.addEventListener("removedrawing", function (event) {
+        if(that.item.type==='content'){
+          currentPage=that.getCurrentPage();
+          that.socket.emit('removedrawing', event, that.item.id,'content',currentPage.id);  
+        }else{
+          that.socket.emit('removedrawing', event, that.item.id, 'whiteboard');
+        }
+      });
+      that.paint.addEventListener("rotate", function (event) {
+        if(that.item.type==='content'){
+          currentPage=that.getCurrentPage();
+          that.socket.emit('rotate', event, that.item.id,'content',currentPage.id);  
+        }else{
+          that.socket.emit('rotate', event, that.item.id, 'whiteboard');
+        }
+      });
+      that.paint.addEventListener("resize", function (event) {
+        if(that.item.type==='content'){
+          currentPage=that.getCurrentPage();
+          that.socket.emit('resize', event, that.item.id,'content',currentPage.id);  
+        }else{
+          that.socket.emit('resize', event, that.item.id, 'whiteboard');
         }
       });
       window.addEventListener('resize', function (event){

@@ -1,3 +1,4 @@
+body{background: #e1f1f1;}
 nav .fa{font-size: 25px;}
 nav svg.nav-time-record{vertical-align: top;}
 nav .fa:hover,nav svg.nav-time-record:hover{opacity: 0.5;text-decoration: none;}
@@ -5,6 +6,7 @@ nav#media-controls{ border-radius: 5px;-webkit-border-radius: 5px;}
 .playground{min-height: 500px;}
 /* left sidebar */
 .left-sidebar{min-height: 400px;}
+.right-sidebar{background: #FFFFFF;}
 /* Chat Box */
 #chatBox{/*height: 250px;*/}
 #chatBox ul.chat-bar li{position: relative; cursor: pointer;}
@@ -768,7 +770,6 @@ border-radius: .25rem;
 }
 
 .default-tab p {
-  margin-top: 17px;
   font-size: 21px;
 }
 .tool-item{
@@ -776,12 +777,13 @@ border-radius: .25rem;
   height: 30px;
   display: block;
   background-size: cover;
+  font-size: 24px;
 }
 .tool-item.fa-slash{top: 6px; position: relative; font-size: 20px;} 
 .tool-arrow{ background-image: url('../img/arrow.png') }
 .tool-brush{ background-image: url('../img/brush.png') }
 .tool-circle{ background-image: url('../img/circal.png') }
-.tool-colorpicker{ background-image: url('../img/colorpicker.png') }
+/*.tool-colorpicker{ background-image: url('../img/colorpicker.png') }*/
 .tool-eraser{ background-image: url('../img/eraser.png') }
 .tool-grab{ background-image: url('../img/grab.png') }
 .tool-pen{ background-image: url('../img/pentool.png') }
@@ -789,13 +791,35 @@ border-radius: .25rem;
 .tool-text{ background-image: url('../img/texticon.png') }
 .tool-triangle{ background-image: url('../img/trigle.png') }
 .tool-undo{ background-image: url('../img/undodrawing.png') }
+.controls-bottom .control-button {
+    border: none;
+}
+.controls-bottom {
+    position: absolute;
+    bottom: 0px;
+    left: 42%;.content-tabs {
+    background: #FFF;
+}
+}
 
 .control-container.controls-top .control-button, .control-container.controls-top .control-integer .control-button{padding: 2px;}
-.control-container.controls-left .control-button{padding: 6px 2px;}
+.control-container.controls-left .control-button{padding: 6px 2px;border-bottom: 0px;border-top: 0px;}
+.control-container.controls-left .control-integer{padding: 7.5px 2px 8px 2px;}
 .container-group .control-group{width: 600px; top: 0px; left: 37px;}
 .control-container.controls-left .container-group > .control-button i.tool-item,.tool-select{font-size: 24px;}
-.control-container.controls-left .container-group .control-group .control-button{width: 44px; display: inline;border-top: 1px solid black;border-bottom: 1px solid black;}
-.control-container.controls-left .container-group .control-group .control-button:last-child{border-radius: 0px 5px 5px 0px !important;border-right: 1px solid black;}
+.control-container.controls-left .container-group .control-group .control-button,.control-container.controls-left .container-group .control-group .control-integer{width: 44px; display: inline-block;border-top: 1px solid black;border-bottom: 1px solid black !important;border-right: 0px;}
+.control-container.controls-left .container-group .control-group > :last-child{border-radius: 0px 5px 5px 0px !important;border-right: 1px solid black;}
+.control-container.controls-left .control-button:last-child {
+    border-bottom: 1px solid #b9b9b9 !important;
+    border-radius: 0px 0px 5px 0px !important;
+}
+.control-container.controls-left > .control-button:first-child {
+    border-top: 1px solid #b9b9b9 !important;
+    border-radius: 0px 5px 0px 0px !important;
+}
+.content-tabs {
+    background: #FFF;
+}
 .fa-4{font-size: 4em;}
 .theme-color{color: #900000;}
 .content-item >a >i.fa-file-pdf,.content-item >a >img{height: 100px;}
@@ -813,6 +837,9 @@ border-radius: .25rem;
 /* conference view*/
 .conference-view .left-sidebar {
     display: none;
+}
+div#content-block:-webkit-full-screen,div#content-block:-moz-full-screen,div#content-block:-ms-fullscreen,div#content-block:fullscreen {
+  background: #FFFFFF !important;
 }
 .conference-view .right-sidebar {
     width: 100% !important;

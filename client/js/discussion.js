@@ -693,23 +693,27 @@ import VueYouTubeEmbed from 'vue-youtube-embed';
         if (e) e.stopPropagation()
       },
       handleResize: function (firstTime) {
-        this.$nextTick(function () {
+        let that=this;
+        that.$nextTick(function () {
           // right-sidebar margin
           document.querySelector('.right-sidebar').style="margin-top: "+(document.getElementById('play-menu').clientHeight) +"px";
           // Remaining playground height= (Window - NavBar - Navbar bottom Margin - Playground bottom margin)
           let heightToPlay = window.innerHeight - document.querySelector('.header-bar').clientHeight - 16 - 16
           // Remaining ChatList height= (Playground - Playground margin - Playground padding - Playground border - Video - ChatBox margin - Chatbox heading - Chat Input - PlayMenu Height - Margin Top Right Sidebar - Margin Bottom Video Box - Video Box Header)
-          let heightToChat = heightToPlay - 16 - 32 - 1 - /*document.querySelector('.chat-bar').clientHeight -*/ document.getElementById('video-container').clientHeight - 16 - 33 - document.querySelector('.chat-input').clientHeight - document.getElementById('play-menu').clientHeight - 16 - 16 - 49
+          let heightToChat = heightToPlay - 12 - 16 - 32 - 1 - /*document.querySelector('.chat-bar').clientHeight -*/ document.getElementById('video-container').clientHeight - 16 - 33 - document.querySelector('.chat-input').clientHeight - document.getElementById('play-menu').clientHeight - 16 - 16 - 49
           // minHeight=video + top margin + padding + heading + heading margin + bottom margin + Play Menu Height +  Margin Top Right Sidebar + Margin Bottom Video Box + Video Box Header +  minHeight for chatlist
-          let minHeight = document.getElementById('video-container').clientHeight + 16 + 32 + 33 + 8 + 10 + document.getElementById('play-menu').clientHeight + 16 + 16 + 49 +128 + /*document.querySelector('.chat-bar').clientHeight +*/ document.querySelector('.chat-input').clientHeight
+          let minHeight = document.getElementById('video-container').clientHeight + 16 + 32 + 33 + 8 + 10 + document.getElementById('play-menu').clientHeight + 16 + 16 + 49 +130 + /*document.querySelector('.chat-bar').clientHeight +*/ document.querySelector('.chat-input').clientHeight
 
           if (heightToPlay < minHeight) heightToPlay = minHeight
           document.querySelector('.playground').style = (window.innerWidth <= 768 ? '' : 'height: ' + heightToPlay + 'px;') + ' min-height: ' + minHeight + 'px'
-          if (heightToChat < 0) heightToChat = 128
+          if (heightToChat < 0) heightToChat = 116
           document.querySelectorAll('.chat-list').forEach(tab => {
-            tab.style = 'height: ' + heightToChat + 'px;min-height: 128px'
+            tab.style = 'height: ' + heightToChat + 'px;min-height: 116px'
           })
           let rightSideHeight = heightToPlay - 16 - 16 - 1 - document.getElementById('play-menu').clientHeight
+          if(that.isInFullScreen()){
+            rightSideHeight=window.innerHeight- document.getElementById('play-menu').clientHeight;
+          }
           // rightSideHeight= rightSideHeight < minHeight ? minHeight : rightSideHeight;
           document.querySelectorAll('.content-tabs').forEach(function (tab) {
             tab.style = 'height: ' + rightSideHeight + 'px'
@@ -899,12 +903,14 @@ import VueYouTubeEmbed from 'vue-youtube-embed';
         this.socket.emit('raisehand')
         Vue.toasted.success('Request has been sent to presenter!', { position: 'bottom-right' }).goAway(1500)
       },
-      toggleFullscreen: function (elemId) {
-        var isInFullScreen = (document.fullscreenElement && document.fullscreenElement !== null) ||
+      isInFullScreen: function(){
+        return (document.fullscreenElement && document.fullscreenElement !== null) ||
         (document.webkitFullscreenElement && document.webkitFullscreenElement !== null) ||
         (document.mozFullScreenElement && document.mozFullScreenElement !== null) ||
-        (document.msFullscreenElement && document.msFullscreenElement !== null)
-        if (isInFullScreen) {
+        (document.msFullscreenElement && document.msFullscreenElement !== null);
+      },
+      toggleFullscreen: function (elemId) {
+        if (this.isInFullScreen()) {
           if (document.exitFullscreen) {
             document.exitFullscreen()
           } else if (document.webkitExitFullscreen) {

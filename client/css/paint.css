@@ -519,7 +519,7 @@
 }
 /* controls */
 .control-container  .control-button,.control-container  .control-integer .control-button {
-	border-bottom: 1px solid #b9b9b8;
+	border-right: 1px solid #b9b9b8;
 }
 .control-container > .control-integer > .input-group  > .control-button:first-child{
 	border-right: 0px;
@@ -531,13 +531,13 @@
 .control-container.controls-top{height: 34px;}
 .control-button {
 	display: inline-block;
-	background: rgb(225, 225, 225);
+	background: #ffffff;
 	cursor: pointer;
 	padding: 5px 10px;
 	border-right: 1px solid #b9b9b8;
 }
-.control-button:hover {
-	background: rgb(215, 215, 215);
+button.control-button:hover {
+	background: #e1f1f1;
 }
 .control-integer {
 	display: inline-block;
@@ -553,7 +553,6 @@
 }
 
 .control-container.controls-left .control-button {
-    border-right: 0px;
     width: 100%;
 }
 /* paint */
@@ -590,7 +589,7 @@
 	background-color: #fffff;
 }
 .paint-selected-tool {
-	background: rgb(190, 190, 190);
+	background:#e1f1f1;
 }
 .paint-selected-tool:hover {
 	background: rgb(180, 180, 180);
