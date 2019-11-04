@@ -6076,6 +6076,7 @@ module.exports=(...args)=>{
 			.click(e=>{
 					this.initialCords=e;
 					this.isRotating = !this.isRotating;
+					this.effectsCanvas.style.cursor = "ns-resize";
 			})
 			// .mousemove(e=>{
 			//     if(isRotating){
@@ -6089,6 +6090,7 @@ module.exports=(...args)=>{
 				  this.initialCords=e;
 			    this.initialDrawingCords=Object.assign({},this.localDrawings[this.selectedDrawingIndex]);
 			    this.isResizing = !this.isResizing;
+			    this.effectsCanvas.style.cursor = "nesw-resize";
 			})
 			// .mousemove(_=>{
 			//     if(isResizing){
@@ -6209,13 +6211,16 @@ module.exports=(...args)=>{
 				this.resizeControl.show().offset({top: se[1]+adjustY, left: se[0]+adjustX});
 			}
 		};
+		Paint.prototype.hideControls= function hideControls(){
+			if(this.rotateControl) this.rotateControl.hide();
+			if(this.resizeControl) this.resizeControl.hide();
+		}
 		Paint.prototype.hideDrawingControls = function hideDrawingControls (){
 				this.effectsCanvasCtx.clearRect(0, 0, this.effectsCanvas.width, this.effectsCanvas.height);
 				this.isRotating=false;
 				this.isResizing=false;
 				this.initialDrawingCords=null;
-				if(this.rotateControl) this.rotateControl.hide();
-				if(this.resizeControl) this.resizeControl.hide();
+				this.hideControls();
 		};
 		
 		Paint.prototype.rotateDrawing = function rotateDrawing(angle){
@@ -9340,11 +9345,11 @@ module.exports=(...args)=>{
 				context.strokeStyle = drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
 				context.lineWidth = drawing.stroke_size;
+				context.closePath();
 				
 				context.stroke();
 				context.fill();
 				
-				context.closePath();
 				context.restore();
 				
 				if (tiledCanvas) {
@@ -9353,7 +9358,7 @@ module.exports=(...args)=>{
 					var bottomRightX=Math.max(drawing.x,drawing.x1);
 					var bottomRightY=Math.max(drawing.y,drawing.y - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) ));
 					
-					tiledCanvas.drawingRegion(topLeftX - drawing.stroke_size , topLeftY -drawing.stroke_size, bottomRightX + drawing.stroke_size, bottomRightY + drawing.stroke_size, drawing.size);
+					tiledCanvas.drawingRegion(topLeftX - drawing.stroke_size -50 , topLeftY -drawing.stroke_size -50, bottomRightX + drawing.stroke_size, bottomRightY + drawing.stroke_size, drawing.size);
 					tiledCanvas.executeNoRedraw();
 				}
 			},
@@ -9375,9 +9380,9 @@ module.exports=(...args)=>{
 				context.lineWidth=drawing.stroke_size;
 				context.strokeStyle=drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
+				context.closePath();
 				context.stroke();
 				context.fill();
-				context.closePath();
 				context.restore();
 				if (tiledCanvas) {
 					var topLeftX=Math.min(drawing.x,drawing.x1,drawing.x - diffX);
