@@ -7628,7 +7628,7 @@ module.exports=(...args)=>{
 				type: "group",
 				html: "i",
 				place: "left",
-				elemClass: "tool-item fa fa-pencil-alt",
+				elemClass: "tool-item  fa fa-fill",
 				title: "Select stroke size",
 				value: "strokesize",
 				action: _=>{}
@@ -7658,7 +7658,7 @@ module.exports=(...args)=>{
 				type: "group",
 				html: "i",
 				place: "left",
-				elemClass: "tool-item fa fa-pen",
+				elemClass: "tool-item fa fa-pen-nib",
 				title: "Select tool size",
 				value: "toolsize",
 				action: _=>{}
