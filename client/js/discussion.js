@@ -903,6 +903,16 @@ import VueYouTubeEmbed from 'vue-youtube-embed';
         this.socket.emit('raisehand')
         Vue.toasted.success('Request has been sent to presenter!', { position: 'bottom-right' }).goAway(1500)
       },
+      resetRoom: function(){
+        document.querySelector('.webcam-container').style="";
+        document.querySelector('.chat-container').style="";
+        this.layout="classroom-view";
+      },
+      dragBox: function(className,e){
+        if(e.clientY<= 5 || e.clientX <= 5) return;
+        let rightWidth=document.querySelector('.right-sidebar').clientWidth -30;
+        document.querySelector('.'+className).style="z-index: 99999;position:fixed;top:"+(e.clientY-40)+"px;left:"+(e.clientX - rightWidth + 45)+"px;width: "+rightWidth+"px";
+      },
       isInFullScreen: function(){
         return (document.fullscreenElement && document.fullscreenElement !== null) ||
         (document.webkitFullscreenElement && document.webkitFullscreenElement !== null) ||

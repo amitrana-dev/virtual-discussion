@@ -529,6 +529,11 @@
     width: 37px;
 }
 .control-container.controls-top{height: 34px;}
+.control-container.controls-bottom.hideMe > .control-button{display: none;}
+.control-container.controls-bottom.hideMe > .control-button.hide-tool{display: block;}
+.control-container.controls-bottom.hideMe > .control-button.hide-tool i.fa-angle-double-down:before{content: "\f102";}
+
+
 .control-button {
 	display: inline-block;
 	background: #ffffff;

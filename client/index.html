@@ -21,7 +21,7 @@
     </style>
   </head>
   <body>
-    <div id="discussion_board" class="container-fluid" :class="{'conference-view': (layout == 'conference-view'),'classroom-view': (layout == 'classroom-view')}">
+    <div id="discussion_board" class="container-fluid" :class="layout">
        <div id="equationToolbar" style="display: none;"></div>
        <header class=" header-bar">
         <div class="header-cont d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-0 bg-white border-bottom shadow-sm nav-bar">
@@ -77,6 +77,7 @@
             <select class="slecct-menu" @change="changeLayout"  v-if="loggedInUser && loggedInUser.presenter">
               <option :selected="layout=='classroom-view'" value="classroom-view">Classroom View</option>
               <option :selected="layout=='conference-view'" value="conference-view">Conference View</option>
+              <option :selected="layout=='presentation-view'" value="presentation-view">Presentation View</option>
             </select>
             <span class="breakout-name" v-if="!loggedInUser || !loggedInUser.presenter">{{currentBreakout ? currentBreakout.name : 'Main Room'}}</span>
             <select class="slecct-menu" @change="enterRoom" v-if="loggedInUser && loggedInUser.presenter">
@@ -120,6 +121,7 @@
             </div>
             <a class="ml-md-3 text-white fa" href="javascript:void(0)" title="Toggle Fullscreen" @click="toggleFullscreen('content-block')"><i class="fa fa-expand"></i></a>
             <a class="ml-md-3 text-white fa" href="javascript:void(0)" title="Video Setting"><i class="fa fa-cog"></i></a>
+            <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 text-white fa" href="javascript:void(0)" @click="resetRoom()" title="Reset Windows"><i class="fa fa-window-restore"></i></a>
           </nav>
           <nav class="my-2 my-md-0 mr-md-3">
             <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 fa" href="javascript:void(0)" v-if="loggedInUser && loggedInUser.presenter " title="Share Screen" id="toggleScreen" @click="toggleScreen" :class="{'text-danger': isScreenShared,'text-white': !isScreenShared}"><i class="fa fa-desktop"></i></a>
@@ -129,7 +131,7 @@
         </div>  
        </header>
        <div class="d-flex flex-column flex-md-row p-3 px-md-4 mb-3  border-bottom shadow-sm playground">
-        <div id="content-block" class="col-md-9 left-sidebar col-sm-12 p-0" :class="{'no-edit': !loggedInUser || (!loggedInUser.presenter && !loggedInUser.permissions.edit && (!currentBreakout || currentBreakout.groupLeader !=loggedInUser.identity) )}">
+        <div id="content-block" class="col-md-12 left-sidebar col-sm-12 p-0" :class="{'no-edit': !loggedInUser || (!loggedInUser.presenter && !loggedInUser.permissions.edit && (!currentBreakout || currentBreakout.groupLeader !=loggedInUser.identity) )}">
           <!-- Tabs nav started -->
           <ul class="nav nav-tabs" id="play-menu">
             <li class="nav-item dropdown">
@@ -529,13 +531,13 @@
         <div class="col-sm-12 d-xs-block mt-3 d-md-none"></div>
         <div class="col-md-3 right-sidebar col-sm-12 border-top">
           <div class="card webcam-container mb-3 mt-3 rounded-0">
-            <div class="card-header">Web Cam <span class="float-right cursor-pointer" @click="toggleBox('webcam')" v-if="showWebCamBox"><i class="fa fa-minus"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('webcam')" v-if="!showWebCamBox"><i class="fa fa-plus"></i></span></div>
+            <div class="card-header">Web Cam <span class="float-right cursor-pointer ml-3" draggable="true" @drag="dragBox('webcam-container',$event)"><i class="fa fa-grip-vertical"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('webcam')" v-if="showWebCamBox"><i class="fa fa-minus"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('webcam')" v-if="!showWebCamBox"><i class="fa fa-plus"></i></span></div>
             <div class="card-body animated p-0" :class="{'fadeOutUp': !showWebCamBox,'fadeInDown': showWebCamBox,'d-block': showWebCamBox,'d-none': !showWebCamBox}">
               <video-box :socket="socket" @toggle-fullscreen="toggleFullscreen" @recording-stopped="stopRecording" @screen-share-stopped="stopScreenShare" :is-vid-available="isVidAvailable" :is-screen-shared="isScreenShared" :is-audio-available="isAudioAvailable"  :is-recording-available="isRecordingAvailable" :discussion-id="discussionId"></video-box>
             </div>
           </div>
           <div class="card chat-container rounded-0">
-            <div class="card-header">Chats <span class="float-right cursor-pointer" @click="toggleBox('chat')" v-if="showChatBox"><i class="fa fa-minus"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('chat')" v-if="!showChatBox"><i class="fa fa-plus"></i></span></div>
+            <div class="card-header">Chats <span class="float-right cursor-pointer ml-3" draggable="true" @drag="dragBox('chat-container',$event)"><i class="fa fa-grip-vertical"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('chat')" v-if="showChatBox"><i class="fa fa-minus"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('chat')" v-if="!showChatBox"><i class="fa fa-plus"></i></span></div>
             <div class="card-body animated pt-0" :class="{'fadeOutUp': !showChatBox,'fadeInDown': showChatBox,'d-block': showChatBox,'d-none': !showChatBox}">
               <chat-box :socket="socket" :logged-in-user="loggedInUser" :show-web-cam-box="showWebCamBox" :show-chat-box="showChatBox"  :participants="participants" ref="chatBox" @chat-group-changed="handleResize"></chat-box>
             </div>

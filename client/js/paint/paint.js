@@ -71,7 +71,7 @@ module.exports=(...args)=>{
 
 		Controls.prototype.constructors.button = function createButton (control) {
 			var input = document.createElement("button");
-			input.className = (control.classAppend || "") + "control-button btn rounded-0 btn-sm";
+			input.className = (control.classAppend || "") + " control-button btn rounded-0 btn-sm";
 
 			if (control.value)
 				input.value = control.value;
@@ -6235,20 +6235,24 @@ module.exports=(...args)=>{
 				});
 			}
 		};
-		Paint.prototype.resizeDrawing = function resizeDrawing(change,newCords){
+		Paint.prototype.resizeDrawing = function resizeDrawing(changeX, changeY, newCords){
 			if(typeof this.selectedDrawingIndex != 'undefined'){
 				let drawing=this.localDrawings[this.selectedDrawingIndex];
 				switch(drawing.type){
 					case 'circle':
-						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+change;
-						this.localDrawings[this.selectedDrawingIndex].y1=this.initialDrawingCords.y1+change;
+						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+changeX;
+						this.localDrawings[this.selectedDrawingIndex].y2=this.initialDrawingCords.y2+changeY;
 					break;
 					case 'rhombus':
-						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+change;
-						this.localDrawings[this.selectedDrawingIndex].y1=this.initialDrawingCords.y1+change;
+						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+changeX;
+						this.localDrawings[this.selectedDrawingIndex].y1=this.initialDrawingCords.y1+changeY;
+
+						this.localDrawings[this.selectedDrawingIndex].x2=this.initialDrawingCords.x1+changeX;
+						this.localDrawings[this.selectedDrawingIndex].y2=this.localDrawings[this.selectedDrawingIndex].y1 - Math.abs(this.localDrawings[this.selectedDrawingIndex].x1 -this.localDrawings[this.selectedDrawingIndex].x);
 					break;
 					case 'triangle':
-						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+change;
+						this.localDrawings[this.selectedDrawingIndex].x1=this.initialDrawingCords.x1+changeX;
+						this.localDrawings[this.selectedDrawingIndex].y2=this.initialDrawingCords.y2-changeY;
 					break;
 					case 'arrow':
 						this.localDrawings[this.selectedDrawingIndex].x1=Math.round((this.local.leftTopX + (newCords[0] / this.local.zoom)) * this.PATH_PRECISION) / this.PATH_PRECISION;
@@ -6259,7 +6263,7 @@ module.exports=(...args)=>{
 						this.localDrawings[this.selectedDrawingIndex].y1=Math.round((this.local.leftTopY + (newCords[1] / this.local.zoom)) * this.PATH_PRECISION) / this.PATH_PRECISION;
 					break;
 					case 'text':
-						this.localDrawings[this.selectedDrawingIndex].size=this.initialDrawingCords.size+(change/10);
+						this.localDrawings[this.selectedDrawingIndex].size=this.initialDrawingCords.size+(changeX/10);
 					break;
 				}
 				this.redrawLocals();
@@ -7482,6 +7486,23 @@ module.exports=(...args)=>{
 
 		Paint.prototype.createControlArray = function createControlArray () {
 			return [{
+				name: "hide-tools",
+				type: "button",
+				html: "i",
+				place: "bottom",
+				classAppend: "hide-tool",
+				elemClass: "tool-item fa fa-angle-double-down",
+				title: "Toggle control bar",
+				value: "hide-tool",
+				action: function(e){
+					let classes=document.querySelector('.content-tabs.d-block').querySelector('.controls-bottom').classList;
+					if(classes.contains('hideMe')){
+						classes.remove('hideMe');	
+					}else{
+						classes.add('hideMe');
+					}
+				}
+			}, {
 				name: "grab",
 				type: "button",
 				html: "i",
@@ -8086,8 +8107,11 @@ module.exports=(...args)=>{
 				// Is rotating or resizing?
 				if (event.type == "mousemove" && typeof paint.selectedDrawingIndex !='undefined' && (paint.isResizing || paint.isRotating)) {
 					if(paint.isResizing){
-						let change=Math.max(event.clientX - paint.initialCords.clientX,event.clientY - paint.initialCords.clientY);
-					  paint.resizeDrawing(change,scaledCoords);
+						let changeX=event.clientX - paint.initialCords.clientX;
+					  let changeY=event.clientY - paint.initialCords.clientY;
+					  //changeX = changeX < 0 ? 0 : changeX;
+					  //changeY = changeY < 0 ? 0 : changeY;
+					  paint.resizeDrawing(changeX,changeY,scaledCoords);
 				    return;
 					}
 					if(paint.isRotating){
@@ -8234,7 +8258,7 @@ module.exports=(...args)=>{
 									triangle=[
 										[drawing.x, drawing.y],
 										[drawing.x1, drawing.y],
-										[( drawing.x1 + drawing.x )/2 , drawing.y - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )]
+										[drawing.x2, drawing.y2]
 									],
 					     		cx = point[0], cy = point[1],
 					        t0 = triangle[0], t1 = triangle[1], t2 = triangle[2],
@@ -8259,8 +8283,8 @@ module.exports=(...args)=>{
   									paint.rectanglePoints=[
   										[scaledDrawing.x - 5, scaledDrawing.y + 5],
 											[scaledDrawing.x1 + 5, scaledDrawing.y + 5],
-											[scaledDrawing.x1 + 5,scaledDrawing.y - ((scaledDrawing.x1 - scaledDrawing.x) * (Math.sqrt(3)/2) ) - 5],
-											[scaledDrawing.x - 5,scaledDrawing.y - ((scaledDrawing.x1 - scaledDrawing.x) * (Math.sqrt(3)/2) ) - 5]
+											[scaledDrawing.x1 + 5,scaledDrawing.y2 - 5],
+											[scaledDrawing.x - 5,scaledDrawing.y2 - 5]
   									]
 							    }
 								break;
@@ -8281,8 +8305,14 @@ module.exports=(...args)=>{
 					    relativeMotionY = paint.lastSelectCoords[1] - scaledCoords[1];
 					paint.localDrawings[paint.selectedDrawingIndex].x=paint.localDrawings[paint.selectedDrawingIndex].x-relativeMotionX;
 					paint.localDrawings[paint.selectedDrawingIndex].x1=paint.localDrawings[paint.selectedDrawingIndex].x1-relativeMotionX;
+					if(paint.localDrawings[paint.selectedDrawingIndex].x2){
+						paint.localDrawings[paint.selectedDrawingIndex].x2=paint.localDrawings[paint.selectedDrawingIndex].x2-relativeMotionX;	
+					}
 					paint.localDrawings[paint.selectedDrawingIndex].y=paint.localDrawings[paint.selectedDrawingIndex].y-relativeMotionY;
 					paint.localDrawings[paint.selectedDrawingIndex].y1=paint.localDrawings[paint.selectedDrawingIndex].y1-relativeMotionY;
+					if(paint.localDrawings[paint.selectedDrawingIndex].y2){
+						paint.localDrawings[paint.selectedDrawingIndex].y2=paint.localDrawings[paint.selectedDrawingIndex].y2-relativeMotionY;
+					}
 					// Update last drag position
 					paint.lastSelectCoords = scaledCoords;
 					paint.redrawLocals();
@@ -8452,7 +8482,7 @@ module.exports=(...args)=>{
 						paint.trianglePoints.push(scaledCoords);
 						if(paint.trianglePoints.length==2){
 							// Draw final triangle here	
-							paint.addUserDrawing({
+							let triangleDrawing={
 								type: "triangle",
 								x: Math.round((paint.local.leftTopX + (paint.trianglePoints[0][0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
 								y: Math.round((paint.local.leftTopY + (paint.trianglePoints[0][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
@@ -8462,7 +8492,13 @@ module.exports=(...args)=>{
 								color: paint.current_color,
 								stroke_size: paint.current_stroke_size,
 								stroke_color: paint.current_stroke_color
-							});
+							};
+							let length=Math.abs(triangleDrawing.x - triangleDrawing.x1);
+							triangleDrawing.x2=triangleDrawing.x + length / 2;
+							triangleDrawing.y2=triangleDrawing.y1 - length;
+							
+							paint.addUserDrawing(triangleDrawing);
+							
 							delete paint.trianglePoints;
 							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 						}
@@ -8581,7 +8617,7 @@ module.exports=(...args)=>{
 						paint.trianglePoints.push(scaledCoords);
 						if(paint.trianglePoints.length==2){
 							// Draw final triangle here	
-							paint.addUserDrawing({
+							let rhombusDrawing={
 								type: "rhombus",
 								x: Math.round((paint.local.leftTopX + (paint.trianglePoints[0][0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
 								y: Math.round((paint.local.leftTopY + (paint.trianglePoints[0][1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
@@ -8591,7 +8627,11 @@ module.exports=(...args)=>{
 								color: paint.current_color,
 								stroke_size: paint.current_stroke_size,
 								stroke_color: paint.current_stroke_color
-							});
+							};
+							rhombusDrawing.x2=rhombusDrawing.x1;
+							rhombusDrawing.y2=rhombusDrawing.y1-Math.abs(rhombusDrawing.x1 - rhombusDrawing.x);
+							
+							paint.addUserDrawing(rhombusDrawing);
 							delete paint.trianglePoints;
 							paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
 						}
@@ -8673,8 +8713,7 @@ module.exports=(...args)=>{
 					if (paint.lastLinePoint[0] == scaledCoords[0] && paint.lastLinePoint[1] == scaledCoords[1]) {
 						return;
 					}
-
-					paint.addUserDrawing({
+					let circleDrawing={
 						type: "circle",
 						x: Math.round((paint.local.leftTopX + (paint.lastLinePoint[0] / paint.local.zoom)) * paint.PATH_PRECISION)/ paint.PATH_PRECISION,
 						y: Math.round((paint.local.leftTopY + (paint.lastLinePoint[1] / paint.local.zoom)) * paint.PATH_PRECISION) / paint.PATH_PRECISION,
@@ -8684,7 +8723,12 @@ module.exports=(...args)=>{
 						color: paint.current_color,
 						stroke_size: paint.current_stroke_size,
 						stroke_color: paint.current_stroke_color
-					});
+					};
+					let circleRadius=Math.max(Math.abs(circleDrawing.x - circleDrawing.x1),Math.abs(circleDrawing.y - circleDrawing.y1));
+					circleDrawing.x2=circleDrawing.x1;
+					circleDrawing.y2=circleDrawing.y1 - circleRadius;
+					
+					paint.addUserDrawing(circleDrawing);
 
 					delete paint.lastLinePoint;
 					paint.effectsCanvasCtx.clearRect(0, 0, paint.effectsCanvas.width, paint.effectsCanvas.height);
@@ -9335,13 +9379,17 @@ module.exports=(...args)=>{
 				context.beginPath();
 				context.globalCompositeOperation="source-over";
 				if(drawing.rotate){
-					context.translate(((drawing.x + drawing.x1 + (( drawing.x1 + drawing.x )/2) ) / 3) ,((drawing.y + this.FIX_CANVAS_PIXEL_SIZE + drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE + (drawing.y + this.FIX_CANVAS_PIXEL_SIZE - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )) ) / 3));
+					let minX=Math.min(drawing.x,drawing.x1,drawing.x2);
+					let maxX=Math.max(drawing.x,drawing.x1,drawing.x2);
+					let minY=Math.min(drawing.y,drawing.y1,drawing.y2);
+					let maxY=Math.max(drawing.y,drawing.y1,drawing.y2);
+					context.translate( (minX + maxX)/2 , (minY + maxY +  + this.FIX_CANVAS_PIXEL_SIZE * 2)/2);
 					context.rotate(drawing.rotate);
-					context.translate(-((drawing.x + drawing.x1 + (( drawing.x1 + drawing.x )/2) ) / 3),-((drawing.y + this.FIX_CANVAS_PIXEL_SIZE + drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE + (drawing.y + this.FIX_CANVAS_PIXEL_SIZE - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )) ) / 3));
+					context.translate( -((minX + maxX)/2) , -((minY + maxY +  + this.FIX_CANVAS_PIXEL_SIZE * 2)/2));
 				}
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x1, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);			
-				context.lineTo( ( drawing.x1 + drawing.x )/2 , drawing.y - ((drawing.x1 - drawing.x) * (Math.sqrt(3)/2) )  + this.FIX_CANVAS_PIXEL_SIZE );			
+				context.lineTo(drawing.x2 , drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE );			
 				context.strokeStyle = drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
 				context.lineWidth = drawing.stroke_size;
@@ -9367,16 +9415,16 @@ module.exports=(...args)=>{
 				context.beginPath();
 				context.globalCompositeOperation="source-over";
 				var diffX=drawing.x1 - drawing.x;
-				var diffY=drawing.y1 - drawing.y;
+				var diffY=drawing.y2 - drawing.y;
 				if(drawing.rotate){
-					context.translate((drawing.x1 + drawing.x)/2 ,drawing.y + this.FIX_CANVAS_PIXEL_SIZE - diffX/2);
+					context.translate((drawing.x1 + drawing.x)/2 ,(drawing.y2 +drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE*2) /2);
 					context.rotate(drawing.rotate);
-					context.translate(-((drawing.x1 + drawing.x)/2) ,-(drawing.y + this.FIX_CANVAS_PIXEL_SIZE - diffX/2));
+					context.translate( -((drawing.x1 + drawing.x)/2) , -((drawing.y2 +drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE*2) /2));
 				}
 				context.moveTo(drawing.x, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineTo(drawing.x1, drawing.y + this.FIX_CANVAS_PIXEL_SIZE);
-				context.lineTo(drawing.x1, drawing.y - diffX + this.FIX_CANVAS_PIXEL_SIZE);
-				context.lineTo(drawing.x, drawing.y - diffX + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x1, drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE);
+				context.lineTo(drawing.x, drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE);
 				context.lineWidth=drawing.stroke_size;
 				context.strokeStyle=drawing.stroke_color.toRgbString();
 				context.fillStyle = drawing.color.toRgbString();
@@ -9425,15 +9473,40 @@ module.exports=(...args)=>{
 			},
 			circle: function (context, drawing, tiledCanvas) {
 				let circleRadius=Math.max(Math.abs(drawing.x - drawing.x1),Math.abs(drawing.y - drawing.y1));
+				let centerX=drawing.x;
+				let centerY=drawing.y;
+				let width=Math.abs(drawing.x - drawing.x1);
+				let height=Math.abs(drawing.y1 - drawing.y2);
+				context.save();
 				context.beginPath();
 				context.globalCompositeOperation="source-over";
-				context.arc(drawing.x1, drawing.y1, circleRadius, 0, 2 * Math.PI, true);
+				if(drawing.rotate){
+					context.translate(((drawing.x + drawing.x1) / 2) ,(drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE + drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE ) / 2);
+					context.rotate(drawing.rotate);
+					context.translate(-((drawing.x + drawing.x1) / 2) ,-((drawing.y1 + this.FIX_CANVAS_PIXEL_SIZE + drawing.y2 + this.FIX_CANVAS_PIXEL_SIZE) / 2));
+					
+				}
+				if(height != circleRadius){
+					context.moveTo(centerX, centerY);
+				  context.bezierCurveTo(
+				    centerX, centerY - height,
+				    centerX + width*2, centerY - height,
+				    centerX + width*2, centerY);
+				  context.bezierCurveTo(
+				    centerX + width*2, centerY + height,
+				    centerX, centerY + height,
+				    centerX, centerY);
+				}else{
+					context.arc(drawing.x1, drawing.y1, circleRadius, 0, 2 * Math.PI, true);
+				}
+				
 				context.fillStyle = drawing.color.toRgbString();
 				context.lineWidth=drawing.stroke_size;
 				context.strokeStyle=drawing.stroke_color.toRgbString();
 				context.stroke();
 				context.fill();
 				context.closePath();
+				context.restore();
 				
 				if (tiledCanvas) {
 					let topLeftX=drawing.x1 - circleRadius - drawing.stroke_size;

@@ -6,7 +6,7 @@ nav#media-controls{ border-radius: 5px;-webkit-border-radius: 5px;}
 .playground{min-height: 500px;}
 /* left sidebar */
 .left-sidebar{min-height: 400px;}
-.right-sidebar{background: #FFFFFF;}
+.right-sidebar{background: #FFFFFF;right: 24px;position: absolute;}
 /* Chat Box */
 #chatBox{/*height: 250px;*/}
 #chatBox ul.chat-bar li{position: relative; cursor: pointer;}
@@ -589,7 +589,7 @@ div.content-nav .disabled{opacity: 0.5;}
 
 /*default classes*/
 .b-black{border:#000;}
-.cursor-pointer:{cursor: pointer;}
+.cursor-pointer{cursor: pointer;}
 
 /*--stylenew--*/
 .header-cont {
@@ -834,6 +834,9 @@ border-radius: .25rem;
 .content-tabs .toggle-mute{bottom: 0px; right: 20px; font-size: 2em; cursor: pointer;z-index: 999;}
 /* classroom view*/
 .classroom-view  .right-sidebar .webcam-container .remote-videos{display: none;} 
+/* presentation view*/
+.presentation-view  .right-sidebar{display: none;} 
+
 /* conference view*/
 .conference-view .left-sidebar {
     display: none;
