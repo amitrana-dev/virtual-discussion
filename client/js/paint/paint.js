@@ -8943,14 +8943,13 @@ module.exports=(...args)=>{
 
 				}
 
-				if (event.type == "mouseup" || event.type == "touchend" || event.type == "mouseleave") {
+				if (paint.brushing && (event.type == "mouseup" || event.type == "touchend" || event.type == "mouseleave" )) {
 					paint.endEraserPath(true);
 					paint.brushing = false;
 				}
-
 				if (event.type == "mousemove" || event.type == "touchmove") {
 					// If we are brushing we don't need to draw a preview
-					if (!this.brushing) {
+					if (!paint.brushing) {
 						// Clear the previous mouse dot
 						paint.effectsCanvasCtx.clearRect(paint.lastMovePoint[0] - paint.current_size * paint.local.zoom * 2, paint.lastMovePoint[1] - paint.current_size * paint.local.zoom * 2, paint.current_size * paint.local.zoom * 4, paint.current_size * paint.local.zoom * 4);
 
@@ -8960,14 +8959,15 @@ module.exports=(...args)=>{
 						context.arc(scaledCoords[0], scaledCoords[1], (paint.current_size * paint.local.zoom) / 2, 0, 2 * Math.PI, true);
 
 						context.fillStyle = "white";
-						
+						context.lineWidth=1;
+						context.strokeStyle="black";
+						context.stroke();
 						context.fill();
 						context.closePath();
 						// Save the last move point for efficient clearing
 						paint.lastMovePoint[0] = scaledCoords[0];
 						paint.lastMovePoint[1] = scaledCoords[1];
 					}
-
 
 					// If the last brush point is set we are currently drawing
 					if (paint.brushing) {

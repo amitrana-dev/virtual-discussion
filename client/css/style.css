@@ -879,3 +879,6 @@ div#content-block:-webkit-full-screen,div#content-block:-moz-full-screen,div#con
 .notification-person {
     color: #6d6c6c;
 }
+.text-lightgray{
+  color: #dadada;
+}

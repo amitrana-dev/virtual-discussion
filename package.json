@@ -26,6 +26,7 @@
   "homepage": "https://github.com/amitrana-dev/virtual-discussion#readme",
   "dependencies": {
     "@fortawesome/fontawesome-free": "^5.8.2",
+    "babel-plugin-add-module-exports": "^1.0.2",
     "bootstrap": "^4.3.1",
     "browserify": "^16.2.3",
     "bufferutil": "^4.0.1",
@@ -53,7 +54,8 @@
     "vue-youtube-embed": "^2.2.2",
     "vuejs-paginate": "^2.1.0",
     "websocket": "^1.0.28",
-    "yargs": "^12.0.5"
+    "yargs": "^12.0.5",
+    "extend": ""
   },
   "browser": {
     "vue": "vue/dist/vue.common.js",

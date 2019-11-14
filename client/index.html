@@ -120,7 +120,7 @@
               </div>
             </div>
             <a class="ml-md-3 text-white fa" href="javascript:void(0)" title="Toggle Fullscreen" @click="toggleFullscreen('content-block')"><i class="fa fa-expand"></i></a>
-            <a class="ml-md-3 text-white fa" href="javascript:void(0)" title="Video Setting"><i class="fa fa-cog"></i></a>
+            <a class="ml-md-3 text-white fa" href="javascript:void(0)" title="Video Setting" @click="openSettings()"><i class="fa fa-cog"></i></a>
             <a v-if="loggedInUser && loggedInUser.presenter" class="p-2 text-white fa" href="javascript:void(0)" @click="resetRoom()" title="Reset Windows"><i class="fa fa-window-restore"></i></a>
           </nav>
           <nav class="my-2 my-md-0 mr-md-3">
@@ -202,6 +202,103 @@
               </div>
             </div>
           </div>
+          <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['videosetting'],'d-none': !showItem['videosetting']}">
+            <div class="modal-dialog modal-lg" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title text-uppercase">Video Settings</h5>
+                  <button type="button" class="close" data-dismiss="modal" aria-label="Close" @click="closeSettings()">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <ul class="nav nav-tabs">
+                    <li class="nav-item"><a class="nav-link text-dark" :class="{'active': selectedSetting=='video'}" href="javascript:void(0)" @click="selectedSetting='video'">Video Settings</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" :class="{'active': selectedSetting=='connect'}" href="javascript:void(0)" @click="selectedSetting='connect'">Connectivity Test</a></li>
+                    <li class="nav-item"><a class="nav-link text-dark" :class="{'active': selectedSetting=='net'}" href="javascript:void(0)" @click="selectedSetting='net'">Net Speed Check</a></li>
+                  </ul>
+                  <div class="row p-3" v-show="selectedSetting=='video'">
+                    <div class="col-sm-6">
+                      <video id="testVideo" autoplay class="col-sm-12"></video>
+                    </div>
+                    <div class="col-sm-6">
+                      <label>Select Camera</label>
+                      <select class="slecct-menu m-0" id="selectVideo" v-model="selectedCamera" @change="changeDevice">
+                        <option :value="device.id" v-for="device in videoDevices">{{device.name}}</option>
+                      </select>
+                      <label class="pt-3">Select Microphone</label>
+                      <select class="slecct-menu m-0" id="selectAudio" v-model="selectedMic" @change="changeDevice">
+                        <option :value="device.id" v-for="device in audioDevices">{{device.name}}</option>
+                      </select>
+                      <p class="pt-3"><span v-for="index in 10" :key="index" :class="{'text-lightgray': index >= volumePts,'text-primary': index < volumePts,'ml-1': index > 1 }" class="fa fa-circle"></span></p>
+                    </div>
+                  </div>
+
+                  <div class="row p-3" v-show="selectedSetting=='connect'">
+                    <div class="col-sm-12">
+                      <table class="table table-borderless">
+                        <tbody>
+                          <tr>
+                            <th class="text-greenish">Connectivity Status</th>
+                            <td><span v-if="connectivitySettings.internet"><i class="fa fa-check-circle text-greenish"></i> Excellent</span><span v-if="!connectivitySettings.internet"><i class="fa fa-minus-circle text-lightgray"></i> Not Connected</span></td>
+                          </tr>
+                          <tr>
+                            <th class="text-greenish">Browser</th>
+                            <td><span v-if="connectivitySettings.browser"><i class="fa fa-check-circle text-greenish"></i> Compatible</span><span v-if="!connectivitySettings.browser"><i class="fa fa-minus-circle text-lightgray"></i> Non-Compatible</span></td>
+                          </tr>
+                          <tr>
+                            <th class="text-greenish">Connection</th>
+                            <td><span v-if="connectivitySettings.connected"><i class="fa fa-check-circle text-greenish"></i> Established</span><span v-if="!connectivitySettings.connected"><i class="fa fa-minus-circle text-lightgray"></i> Not Connected</span></td>
+                          </tr>
+                          <tr>
+                            <th class="text-greenish">Download Speed</th>
+                            <td><span v-if="connectivitySettings.rtt < 500"><i class="fa fa-check-circle text-greenish"></i> Download fits minimum requirement</span><span v-if="connectivitySettings.rtt >= 500"><i class="fa fa-minus-circle text-lightgray"></i> Unfit to minimum requirement</span></td>
+                          </tr>
+                          <tr>
+                            <th class="text-greenish">Upload Speed</th>
+                            <td><span v-if="connectivitySettings.rtt < 500"><i class="fa fa-check-circle text-greenish"></i> Upload fits minimum requirement</span><span v-if="connectivitySettings.rtt >= 500"><i class="fa fa-minus-circle text-lightgray"></i> Unfit to minimum requirement</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div class="alert alert-dark"><strong>You shall stream video and audio, perform screen sharing and recording</strong></div>
+                    </div>
+                  </div>
+
+                  <div class="row p-3" v-show="selectedSetting=='net'">
+                    <div class="col-sm-12">
+                      <table class="table table-borderless">
+                        <thead>
+                          <tr>
+                            <th class="text-greenish">#</th>
+                            <th class="text-greenish">Server</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <th class="text-greenish">Download Speed</th>
+                            <td><span>{{connectivitySettings.download}}</span></td>
+                          </tr>
+                          <tr>
+                            <th class="text-greenish">Upload Speed</th>
+                            <td><span>{{connectivitySettings.upload}}</span></td>
+                          </tr>
+                          <tr>
+                            <th class="text-greenish">Latency</th>
+                            <td><span>{{connectivitySettings.latency}} ms</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" @click="closeSettings();">Cancel</button>
+                    <button type="button" class="btn btn-primary" @click="getSpeedInfo();">Refresh</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-endclass'],'d-none': !showItem['confirmbox-endclass']}">
             <div class="modal-dialog modal-lg" role="document">
               <div class="modal-content">
@@ -525,7 +622,7 @@
               </div>
             </div>
           </div>
-          <div class="modal-backdrop fade show" :class="{'d-block': showItem['youtube'] || showItem['media'] || showItem['content'] || showItem['import'] || showItem['createbreakout'] || showItem['breakout'] || showItem['participants'] || showItem['confirmbox-participant'] || showItem['confirmbox-breakall'] || showItem['confirmbox-breakselected'] || showItem['confirmbox-clearworkspace'] || showItem['confirmbox-endclass'] ,'d-none': !showItem['youtube'] && !showItem['media'] && !showItem['content'] && !showItem['import'] && !showItem['createbreakout'] && !showItem['breakout'] && !showItem['participants'] && !showItem['confirmbox-breakselected'] && !showItem['confirmbox-breakall'] && !showItem['confirmbox-participant'] && !showItem['confirmbox-clearworkspace'] && !showItem['confirmbox-endclass']}"></div>
+          <div class="modal-backdrop fade show" :class="{'d-block': showItem['youtube'] || showItem['media'] || showItem['content'] || showItem['import'] || showItem['createbreakout'] || showItem['breakout'] || showItem['participants'] || showItem['confirmbox-participant'] || showItem['confirmbox-breakall'] || showItem['confirmbox-breakselected'] || showItem['confirmbox-clearworkspace'] || showItem['confirmbox-endclass'] ,'d-none': !showItem['youtube'] && !showItem['media'] && !showItem['content'] && !showItem['import'] && !showItem['createbreakout'] && !showItem['breakout'] && !showItem['participants'] && !showItem['confirmbox-breakselected'] && !showItem['confirmbox-breakall'] && !showItem['confirmbox-participant'] && !showItem['confirmbox-clearworkspace'] && !showItem['confirmbox-endclass'] && !showItem['videosetting']}"></div>
           <!-- Models ended -->
         </div>
         <div class="col-sm-12 d-xs-block mt-3 d-md-none"></div>

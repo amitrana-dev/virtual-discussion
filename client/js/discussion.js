@@ -2,6 +2,7 @@
 
 import Toasted from 'vue-toasted';
 import VueYouTubeEmbed from 'vue-youtube-embed';
+import JsBandwidth from "./jsbandwidth";
 (function () {
   var Vue = require('vue')
   Vue.use(Toasted)
@@ -73,15 +74,31 @@ import VueYouTubeEmbed from 'vue-youtube-embed';
       showPrivate: null,
       isLoadingContent: false,
       totalContentPages: 0,
-      currentContentPage: 1
+      currentContentPage: 1,
+      volumePts: 0,
+      selectedCamera: '',
+      selectedMic: '',
+      selectedSetting: 'video',
+      videoDevices: [],
+      audioDevices: [],
+      connectivitySettings: {
+          internet: navigator.onLine,
+          browser: true,
+          connected: false,
+          rtt: navigator.connection.rtt,
+          downlink: navigator.connection.downlink,
+          download: navigator.connection.downlink+'Mb/s',
+          upload: navigator.connection.downlink+'Mb/s',
+          latency: '0'
+      },
+      serverUrl: '',
     },
     mounted: function () {
       var that = this
       // pick value from meta tags
       let token = document.querySelector('meta[key=token][value]').getAttribute('value')
       let discussionId = document.querySelector('meta[key=discussion_id][value]').getAttribute('value')
-      let socketServerUrl = document.querySelector('meta[key=socket_server_url][value]').getAttribute('value')
-
+      that.serverUrl = document.querySelector('meta[key=socket_server_url][value]').getAttribute('value')
       // replace if found in query params
       let urlParams = new URLSearchParams(window.location.search)
       let paramToken = urlParams.get('token')
@@ -113,14 +130,15 @@ import VueYouTubeEmbed from 'vue-youtube-embed';
       let bufferDumped = false
       let serverConnectError
       // make socket connection
-      let io = require('socket.io-client')(socketServerUrl, { query: 'token=' + token + '&discussion_id=' + discussionId })
+      let io = require('socket.io-client')(that.serverUrl, { query: 'token=' + token + '&discussion_id=' + discussionId })
       io.on('disconnect', () => {
         serverConnectError = Vue.toasted.error('Server is offline!', { position: 'bottom-right' })
         that.isLoading = true
+        that.connectivitySettings.connected=false;
       })
       io.on('connect', () => {
         if (serverConnectError) serverConnectError.goAway(0)
-
+        that.connectivitySettings.connected=true;
         that.socket = io
         that.socket.on('discussiondetail', function (course) {
           that.course = course
@@ -375,6 +393,7 @@ import VueYouTubeEmbed from 'vue-youtube-embed';
         // load Content files
         //that.changeContentPage(1)
       })
+      that.getSpeedInfo();
     },
     methods: {
       changeMediaPage: function (pageNum) {
@@ -948,6 +967,84 @@ import VueYouTubeEmbed from 'vue-youtube-embed';
         return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
           (c ^ cryptoObj.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
         )
+      },
+      openSettings: function(){
+        this.toggleModel('videosetting');
+        this.changeDevice();
+      },
+      closeSettings: function(){
+        if (window.testStream) {
+          window.testStream.getTracks().forEach(function(track) {
+            track.stop();
+          });
+        }
+        this.toggleModel('videosetting');
+      },
+      changeDevice: function(){
+        let that= this;
+        if (window.testStream) {
+          window.testStream.getTracks().forEach(function(track) {
+            track.stop();
+          });
+        }
+
+        const constraints = {
+          audio: {
+            deviceId: {exact: this.selectedMic}
+          },
+          video: {
+            deviceId: {exact: this.selectedCamera}
+          }
+        };
+        navigator.mediaDevices.getUserMedia(constraints).
+          then(function(stream){
+            window.testStream=stream;
+            document.getElementById('testVideo').srcObject=stream;
+
+            // check audio
+            let audioContext = new AudioContext();
+            let analyser = audioContext.createAnalyser();
+            let microphone = audioContext.createMediaStreamSource(stream);
+            let javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+            analyser.smoothingTimeConstant = 0.8;
+            analyser.fftSize = 1024;
+
+            microphone.connect(analyser);
+            analyser.connect(javascriptNode);
+            javascriptNode.connect(audioContext.destination);
+            javascriptNode.onaudioprocess = function() {
+                var array = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(array);
+                var values = 0;
+
+                var length = array.length;
+                for (var i = 0; i < length; i++) {
+                  values += (array[i]);
+                }
+                var average = values / length;
+                that.volumePts = Math.round(average/10);
+            }
+          }).catch(function(error){
+            Vue.toasted.error(error, { position: 'bottom-right' }).goAway(1500)
+          });
+      },
+      updateConnectionStatus: function(){
+        this.connectivitySettings.internet=navigator.onLine;
+      },
+      updateNetworkInfo: function(){
+        this.connectivitySettings.downlink=navigator.connection.downlink;
+        this.connectivitySettings.rtt=navigator.connection.rtt;
+      },
+      getSpeedInfo: function(){
+        let that=this;
+        
+        let jsBandwidth=new JsBandwidth();
+        jsBandwidth.testSpeed({latencyTestUrl: that.serverUrl+'/check',downloadUrl: that.serverUrl+'/check',uploadUrl: that.serverUrl+'/check'}).then(function(result){
+          that.connectivitySettings.download=(result.downloadSpeed < 0 || isNaN(result.downloadSpeed) ? result.downloadSpeed : Math.floor((result.downloadSpeed / 1000000) * 100) / 100)+'Mb/s';
+          that.connectivitySettings.upload=(result.uploadSpeed < 0 || isNaN(result.uploadSpeed) ? result.uploadSpeed : Math.floor((result.uploadSpeed / 1000000) * 100) / 100)+'Mb/s';
+          that.connectivitySettings.latency=result.latency;
+        });
       }
     },
     computed: {
@@ -961,7 +1058,33 @@ import VueYouTubeEmbed from 'vue-youtube-embed';
       }
     },
     created: function () {
-      this.course = { title: 'Devil-101 \uD83D\uDE08' }
+      let that=this;
+      that.course = { title: 'Devil-101 \uD83D\uDE08' }
+      // get audio,video devices
+      navigator.mediaDevices.enumerateDevices()
+      .then(function(devices){
+        devices.forEach(function(device){
+          if (device.kind === 'audioinput') {
+            that.audioDevices.push({
+              id: device.deviceId,
+              name: device.label || 'microphone ' + (that.audioDevices.length + 1)
+            });
+          }else if (device.kind === 'videoinput') {
+            that.videoDevices.push({
+              id: device.deviceId,
+              name: device.label || 'camera ' + (that.videoDevices.length + 1)
+            });
+          }
+        });
+        if(that.audioDevices.length) that.selectedMic=that.audioDevices[0].id;
+        if(that.videoDevices.length) that.selectedCamera=that.videoDevices[0].id;
+      }).catch(function(error){
+        Vue.toasted.error(error, { position: 'bottom-right' }).goAway(1500)
+      });
+      window.addEventListener('online', that.updateConnectionStatus);
+      window.addEventListener('offline', that.updateConnectionStatus);
+      navigator.connection.addEventListener('change', that.updateNetworkInfo);
+      
     },
     beforeDestroy: function () {
       window.removeEventListener('resize', this.handleResize)

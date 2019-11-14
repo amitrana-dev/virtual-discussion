@@ -13,10 +13,46 @@ const FS=require('fs')
 
 
 const SERVER = HTTP.createServer(function (req, res) {
-  res.end('worker: ' + CLUSTER.worker.id)
+  // Only for getting upload/download speed etc on client side
+  let url=require('url').parse(req.url,true);
+  if(url.pathname == '/check'){
+     res.setHeader('Access-Control-Allow-Origin','*');
+     res.setHeader('Access-Control-Allow-Headers','*');
+     res.setHeader('Connection','close');
+      if (req.method=='GET'){
+        // The response should never be cached or even stored on a hard drive
+        res.setHeader('Cache-Control','no-cache, no-store, no-transform');
+        res.setHeader('Pragma','no-cache'); // Support for HTTP 1.0
+        // Define a content size for the response, defaults to 2MB.
+        var contentSize = 2 * 1024 * 1024;
+        
+        // Provide a base string which will be provided as a response to the client
+        var baseString='This text is so uncool, deal with it. ';
+        var baseLength=baseString.length;
+        // Output the string as much as necessary to reach the required size
+        for (var i = 0 ; i < Math.floor(contentSize / baseLength) ; i++) {
+              res.write(baseString);
+        }
+        // If necessary, complete the response to fully reach the required size.
+        let lastBytes=contentSize % baseLength;
+        if (lastBytes > 0) {
+            res.end(baseString.substr(0,lastBytes));
+        }
+        res.end('The End.');
+      }else if(req.method=='POST'){
+        req.on('data', function(data) {});
+        req.on('end', function() {
+          res.end('post received');
+        })
+      }else{
+        res.end('The End.');  
+      }
+  }else{
+    res.end('Hope you find what you are looking for');  
+  }
 })
 
-if (!STICKY.listen(SERVER, CONFIG.PORT)) {
+if (!STICKY.listen(SERVER, CONFIG.PORT,{workers: 2})) {
   SERVER.once('listening', function () {
     console.log('server started on ' + CONFIG.PORT + ' port')
   })
@@ -44,7 +80,6 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
     let myBreakoutIndex;
     let allBreakouts=[];
     if (CONFIG.DEBUG) { console.log(userToken + ' connected on socket ' + socket.id) }
-    
     Promise.all([DISCUSSION.getInfo(discussionId,REDIS),USER.getUserInfoForDiscussion(userToken,discussionId)])
     .then((result) => {
       [discussionInfo,user]=result
@@ -69,7 +104,7 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
               isAnyChange= true;
               return false;
             }
-
+            console.log(breakout.participants,user.identity);
             if(breakout.participants.indexOf(user.identity) != -1){
               myBreakout=breakout;
               myBreakoutIndex=index;
@@ -142,12 +177,12 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
         REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
           breakouts=JSON.parse(breakouts);
           // Get back to common room
-          breakouts = breakouts.map(function(breakout){
+          breakouts = breakouts.map(function(breakout,currentIndex){
             let indexOfUser=breakout.participants.indexOf(user.identity);
             if(indexOfUser !== -1){
               breakout.participants.splice(indexOfUser);
             }
-            if(index != -1){
+            if(index != -1 && currentIndex == index){
               // enter a specific room
               breakout.participants.push(user.identity);
             }
@@ -169,6 +204,8 @@ if (!STICKY.listen(SERVER, CONFIG.PORT)) {
       });
       socket.on('endbreakout', function (index) {
         if(!user.presenter) return;
+        REDIS.hdel('workplace', originalDiscussionId + '-'+index.toString()); 
+        REDIS.hdel('presenters', originalDiscussionId + '-'+index.toString()); 
         REDIS.hget('breakouts', originalDiscussionId, (err,breakouts)=>{
           breakouts=JSON.parse(breakouts);
           breakouts.splice(index, 1);
