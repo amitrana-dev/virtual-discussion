@@ -987,6 +987,14 @@ import JsBandwidth from "./jsbandwidth";
             track.stop();
           });
         }
+        if(window.stream){
+         window.stream.getTracks().forEach(function(track) {
+            track.stop();
+          }); 
+        }
+        this.isVidAvailable=false;
+        this.isAudioAvailable=false;
+
 
         const constraints = {
           audio: {
@@ -998,6 +1006,7 @@ import JsBandwidth from "./jsbandwidth";
         };
         navigator.mediaDevices.getUserMedia(constraints).
           then(function(stream){
+            
             window.testStream=stream;
             document.getElementById('testVideo').srcObject=stream;
 

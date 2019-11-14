@@ -13,7 +13,7 @@ module.exports={
         localTracks: {audio: null, video: null}
       }
     },
-    props: ['isVidAvailable', 'isAudioAvailable', 'isRecordingAvailable','isScreenShared', 'discussionId', 'socket'],
+    props: ['selectedMic','selectedCamera','isVidAvailable', 'isAudioAvailable', 'isRecordingAvailable','isScreenShared', 'discussionId', 'socket'],
     methods: {
       toggleStream: function () {
         if (window.stream) {
@@ -29,7 +29,12 @@ module.exports={
       fetchStream: function () {
         var that = this
         if (this.isVidAvailable || this.isAudioAvailable) {
-          navigator.mediaDevices.getUserMedia({ video: this.isVidAvailable, audio: this.isAudioAvailable })
+          let constraints={}
+          constraints.video=this.isVidAvailable;
+          constraints.audio=this.isAudioAvailable;
+          if(this.isVidAvailable && this.selectedCamera) constraints.video={deviceId: {exact: this.selectedCamera}}; 
+          if(this.isAudioAvailable && this.selectedMic) constraints.audio={deviceId: {exact: this.selectedMic}}; 
+          navigator.mediaDevices.getUserMedia(constraints)
             .then(that.gotStream).catch(console.log)
         }else{
          that.toggleStream() 

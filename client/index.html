@@ -180,7 +180,23 @@
             <div class="overlay position-absolute"></div>
           </div>
           <!-- Tabs Body ended -->
-          <!-- Loader -->
+        </div>
+        <div class="col-sm-12 d-xs-block mt-3 d-md-none"></div>
+        <div class="col-md-3 right-sidebar col-sm-12 border-top">
+          <div class="card webcam-container mb-3 mt-3 rounded-0">
+            <div class="card-header">Web Cam <span class="float-right cursor-pointer ml-3" draggable="true" @drag="dragBox('webcam-container',$event)"><i class="fa fa-grip-vertical"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('webcam')" v-if="showWebCamBox"><i class="fa fa-minus"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('webcam')" v-if="!showWebCamBox"><i class="fa fa-plus"></i></span></div>
+            <div class="card-body animated p-0" :class="{'fadeOutUp': !showWebCamBox,'fadeInDown': showWebCamBox,'d-block': showWebCamBox,'d-none': !showWebCamBox}">
+              <video-box :socket="socket" @toggle-fullscreen="toggleFullscreen" @recording-stopped="stopRecording" @screen-share-stopped="stopScreenShare" :selected-camera="selectedCamera" :selected-mic="selectedMic" :is-vid-available="isVidAvailable" :is-screen-shared="isScreenShared" :is-audio-available="isAudioAvailable"  :is-recording-available="isRecordingAvailable" :discussion-id="discussionId"></video-box>
+            </div>
+          </div>
+          <div class="card chat-container rounded-0">
+            <div class="card-header">Chats <span class="float-right cursor-pointer ml-3" draggable="true" @drag="dragBox('chat-container',$event)"><i class="fa fa-grip-vertical"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('chat')" v-if="showChatBox"><i class="fa fa-minus"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('chat')" v-if="!showChatBox"><i class="fa fa-plus"></i></span></div>
+            <div class="card-body animated pt-0" :class="{'fadeOutUp': !showChatBox,'fadeInDown': showChatBox,'d-block': showChatBox,'d-none': !showChatBox}">
+              <chat-box :socket="socket" :logged-in-user="loggedInUser" :show-web-cam-box="showWebCamBox" :show-chat-box="showChatBox"  :participants="participants" ref="chatBox" @chat-group-changed="handleResize"></chat-box>
+            </div>
+          </div>
+        </div>
+        <!-- Loader -->
           <div class="modal-backdrop fade show loader" :class="{'d-block': isLoading ,'d-none': !isLoading}"><div class="position-fixed loader-container"><div class="lds-ripple"><div class="border-white"></div><div class="border-white"></div></div></div></div>
           <!-- Models started -->
           <div class="modal classroom-popups" tabindex="-1" role="dialog" :class="{'d-block': showItem['confirmbox-clearworkspace'],'d-none': !showItem['confirmbox-clearworkspace']}">
@@ -624,23 +640,6 @@
           </div>
           <div class="modal-backdrop fade show" :class="{'d-block': showItem['youtube'] || showItem['media'] || showItem['content'] || showItem['import'] || showItem['createbreakout'] || showItem['breakout'] || showItem['participants'] || showItem['confirmbox-participant'] || showItem['confirmbox-breakall'] || showItem['confirmbox-breakselected'] || showItem['confirmbox-clearworkspace'] || showItem['confirmbox-endclass'] ,'d-none': !showItem['youtube'] && !showItem['media'] && !showItem['content'] && !showItem['import'] && !showItem['createbreakout'] && !showItem['breakout'] && !showItem['participants'] && !showItem['confirmbox-breakselected'] && !showItem['confirmbox-breakall'] && !showItem['confirmbox-participant'] && !showItem['confirmbox-clearworkspace'] && !showItem['confirmbox-endclass'] && !showItem['videosetting']}"></div>
           <!-- Models ended -->
-        </div>
-        <div class="col-sm-12 d-xs-block mt-3 d-md-none"></div>
-        <div class="col-md-3 right-sidebar col-sm-12 border-top">
-          <div class="card webcam-container mb-3 mt-3 rounded-0">
-            <div class="card-header">Web Cam <span class="float-right cursor-pointer ml-3" draggable="true" @drag="dragBox('webcam-container',$event)"><i class="fa fa-grip-vertical"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('webcam')" v-if="showWebCamBox"><i class="fa fa-minus"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('webcam')" v-if="!showWebCamBox"><i class="fa fa-plus"></i></span></div>
-            <div class="card-body animated p-0" :class="{'fadeOutUp': !showWebCamBox,'fadeInDown': showWebCamBox,'d-block': showWebCamBox,'d-none': !showWebCamBox}">
-              <video-box :socket="socket" @toggle-fullscreen="toggleFullscreen" @recording-stopped="stopRecording" @screen-share-stopped="stopScreenShare" :is-vid-available="isVidAvailable" :is-screen-shared="isScreenShared" :is-audio-available="isAudioAvailable"  :is-recording-available="isRecordingAvailable" :discussion-id="discussionId"></video-box>
-            </div>
-          </div>
-          <div class="card chat-container rounded-0">
-            <div class="card-header">Chats <span class="float-right cursor-pointer ml-3" draggable="true" @drag="dragBox('chat-container',$event)"><i class="fa fa-grip-vertical"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('chat')" v-if="showChatBox"><i class="fa fa-minus"></i></span> <span class="float-right cursor-pointer" @click="toggleBox('chat')" v-if="!showChatBox"><i class="fa fa-plus"></i></span></div>
-            <div class="card-body animated pt-0" :class="{'fadeOutUp': !showChatBox,'fadeInDown': showChatBox,'d-block': showChatBox,'d-none': !showChatBox}">
-              <chat-box :socket="socket" :logged-in-user="loggedInUser" :show-web-cam-box="showWebCamBox" :show-chat-box="showChatBox"  :participants="participants" ref="chatBox" @chat-group-changed="handleResize"></chat-box>
-            </div>
-          </div>
-        </div>
-        
       </div>
 
     </div>
