@@ -554,7 +554,9 @@ button.control-button:hover {
 .control-container.controls-left {
     position: absolute;
     width: 37px;
-    margin-top: 37px;
+    margin-top: 5px;
+    height: 96%;
+    overflow-y: auto;
 }
 
 .control-container.controls-left .control-button {

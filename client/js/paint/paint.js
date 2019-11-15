@@ -216,15 +216,22 @@ module.exports=(...args)=>{
 				html: "i",
 				elemClass: control.elemClass,
 				title: control.title,
-				action: function () {
-					let elem=container.querySelector('.container-'+control.value);
-					elem.style.display=elem.style.display == 'none' ? 'block' : 'none';
-				}
+				action: function () {}
 			}).containerAppend);
 			var controlGroupContainer = document.createElement("div");
 			controlGroupContainer.className='control-group position-absolute'+' container-'+control.value;
 			controlGroupContainer.style.display='none';
+			
 			container.appendChild(controlGroupContainer);
+			
+			container.addEventListener("mouseover", function (event) {
+				controlGroupContainer.style.display='block';
+				event.preventDefault();
+			});
+			container.addEventListener("mouseout", function (event) {
+				controlGroupContainer.style.display='none';
+				event.preventDefault();
+			});
 			
 			return {
 				input: container,
@@ -9037,7 +9044,7 @@ module.exports=(...args)=>{
 					paint.textToolInput.className = "form-control mt-1 w-auto position-absolute";
 					paint.textToolInput.placeholder = "Type some text";
 					if(textControl.place=='left'){
-						paint.textToolInput.style.top=(controlElem.offsetTop + 30) + 'px';
+						paint.textToolInput.style.top=(controlElem.offsetTop) + 'px';
 						paint.textToolInput.style.left='37px';
 					}else{
 						paint.textToolInput.style.top='37px';

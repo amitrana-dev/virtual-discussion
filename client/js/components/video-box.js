@@ -142,7 +142,6 @@ module.exports={
           if (document.getElementById('remoteVid' + socketId)) document.querySelector('.remote-videos').removeChild(document.getElementById('remoteVid' + socketId))
         }
         that.myConnection = require('../rtc-conn')(newVal, (e, socketId) => {
-          console.log('got streams',e.streams[0],e.streams[0].getAudioTracks(),e.streams[0].getVideoTracks());
           removeTrack(socketId)
           that.setUpRemoteVideo(e.streams[0], socketId)
         }, (e, socketId) => {

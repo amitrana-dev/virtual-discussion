@@ -16,15 +16,8 @@ nav#media-controls{ border-radius: 5px;-webkit-border-radius: 5px;}
   padding: 10px 5px 0 0;
   overflow: auto;
 }
-.chat-list li{margin-bottom: 10px;padding-bottom: 5px;border-bottom: 1px dotted #B3A9A9;}
-.chat-list li.left .chat-body{margin-left: 60px;}
-.chat-list li.right .chat-body{margin-right: 60px;}
+.chat-list li{margin-bottom: 5px;}
 .chat-list li .chat-body p {
-  margin: 0;
-  color: #fff;
-  background-image: linear-gradient(to right, #0c6663, #3c9693);
-  padding: 7px;
-  border-radius: 12px 12px 0px 0px;
 }
 /* YT Player */
 .youtube-player, .youtube-player > iframe,div.code-container .code-editor{ width: 100%; height: 100%;}
@@ -803,8 +796,8 @@ border-radius: .25rem;
 }
 
 .control-container.controls-top .control-button, .control-container.controls-top .control-integer .control-button{padding: 2px;}
-.control-container.controls-left .control-button{padding: 6px 2px;border-bottom: 0px;border-top: 0px;}
-.control-container.controls-left .control-integer{padding: 7.5px 2px 8px 2px;}
+.control-container.controls-left .control-button{padding: 3px 2px;border-bottom: 0px;border-top: 0px;}
+.control-container.controls-left .control-integer{padding: 4.5px 2px 5px 2px;}
 .container-group .control-group{width: 600px; top: 0px; left: 37px;}
 .control-container.controls-left .container-group > .control-button i.tool-item,.tool-select{font-size: 24px;}
 .control-container.controls-left .container-group .control-group .control-button,.control-container.controls-left .container-group .control-group .control-integer{width: 44px; display: inline-block;border-top: 1px solid black;border-bottom: 1px solid black !important;border-right: 0px;}

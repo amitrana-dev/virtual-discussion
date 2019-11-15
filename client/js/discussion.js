@@ -60,7 +60,7 @@ import JsBandwidth from "./jsbandwidth";
       showNotifications: false,
       showParticipants: false,
       showChatBox: true,
-      showWebCamBox: true,
+      showWebCamBox: false,
       notifications: [],
       showTimer: false,
       mediaList: [],
@@ -1064,6 +1064,9 @@ import JsBandwidth from "./jsbandwidth";
     watch: {
       course: function (course) {
         document.title = course.title
+      },
+      isVidAvailable: function(){
+        this.showWebCamBox=this.isVidAvailable;
       }
     },
     created: function () {
