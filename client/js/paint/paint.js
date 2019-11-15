@@ -6549,10 +6549,10 @@ module.exports=(...args)=>{
 
 		// Invalidate the canvas size
 		Paint.prototype.resize = function resize () {
-			for (var cKey = 0; cKey < this.canvasArray.length; cKey++) {
-				this.canvasArray[cKey].width = this.canvasArray[cKey].offsetWidth;
-				this.canvasArray[cKey].height = this.canvasArray[cKey].offsetHeight;
-			}
+			// for (var cKey = 0; cKey < this.canvasArray.length; cKey++) {
+			// 	this.canvasArray[cKey].width = this.canvasArray[cKey].offsetWidth;
+			// 	this.canvasArray[cKey].height = this.canvasArray[cKey].offsetHeight;
+			// }
 			this.public.reinitializeImageSmoothing();
 			this.background.reinitializeImageSmoothing();
 			this.local.reinitializeImageSmoothing();

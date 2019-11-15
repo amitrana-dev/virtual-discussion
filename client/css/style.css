@@ -21,7 +21,7 @@ nav#media-controls{ border-radius: 5px;-webkit-border-radius: 5px;}
 }
 /* YT Player */
 .youtube-player, .youtube-player > iframe,div.code-container .code-editor{ width: 100%; height: 100%;}
-div.code-container select.language-chooser{z-index:99; left: auto !important;}
+div.code-container select.language-chooser{z-index:99; left: 0 !important;}
 .modal-backdrop.show.loader{opacity: 1;}
 .modal-backdrop .loader-container{top: 48%; left: 48%;}
 .zindex-5000{z-index: 5000!important;}

@@ -33,6 +33,7 @@
     "concatenateblobs": "git://github.com/muaz-khan/ConcatenateBlobs.git#604e985565146096e1e7632ec444feba19b2a4cb",
     "crel": "^3.1.0",
     "dotenv": "^6.2.0",
+    "extend": "",
     "filereader": "^0.10.3",
     "fs-extra": "^7.0.1",
     "https": "^1.0.0",
@@ -43,6 +44,7 @@
     "mysql": "^2.17.1",
     "path": "^0.12.7",
     "pdf-image": "^2.0.0",
+    "pdfmake": "^0.1.62",
     "redis": "^2.8.0",
     "socket.io": "^2.2.0",
     "socket.io-client": "^2.2.0",
@@ -54,8 +56,7 @@
     "vue-youtube-embed": "^2.2.2",
     "vuejs-paginate": "^2.1.0",
     "websocket": "^1.0.28",
-    "yargs": "^12.0.5",
-    "extend": ""
+    "yargs": "^12.0.5"
   },
   "browser": {
     "vue": "vue/dist/vue.common.js",

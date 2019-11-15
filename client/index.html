@@ -146,7 +146,7 @@
                 <a class="dropdown-item" href="javascript:void(0)" @click="toggleModel('import')">Import Template</a>
                 <a class="dropdown-item" href="javascript:void(0)" @click="exportTemplate()">Export Template</a>
                 <div class="dropdown-divider"></div>
-                <a class="dropdown-item" href="javascript:void(0)">Save to PDF</a>
+                <a class="dropdown-item" href="javascript:void(0)" @click="saveToPdf()">Save to PDF</a>
               </div>
             </li>
             <li class="nav-item ml-1" v-for="(item,index) in contentTabs">
@@ -238,11 +238,11 @@
                       <video id="testVideo" autoplay class="col-sm-12"></video>
                     </div>
                     <div class="col-sm-6">
-                      <label>Select Camera</label>
+                      <label class="d-block">Select Camera</label>
                       <select class="slecct-menu m-0" id="selectVideo" v-model="selectedCamera" @change="changeDevice">
                         <option :value="device.id" v-for="device in videoDevices">{{device.name}}</option>
                       </select>
-                      <label class="pt-3">Select Microphone</label>
+                      <label class="pt-3 d-block">Select Microphone</label>
                       <select class="slecct-menu m-0" id="selectAudio" v-model="selectedMic" @change="changeDevice">
                         <option :value="device.id" v-for="device in audioDevices">{{device.name}}</option>
                       </select>
@@ -268,11 +268,11 @@
                           </tr>
                           <tr>
                             <th class="text-greenish">Download Speed</th>
-                            <td><span v-if="connectivitySettings.rtt < 500"><i class="fa fa-check-circle text-greenish"></i> Download fits minimum requirement</span><span v-if="connectivitySettings.rtt >= 500"><i class="fa fa-minus-circle text-lightgray"></i> Unfit to minimum requirement</span></td>
+                            <td><span v-if="connectivitySettings.download < 18"><i class="fa fa-check-circle text-greenish"></i> Download fits minimum requirement</span><span v-if="connectivitySettings.rtt >= 18"><i class="fa fa-minus-circle text-lightgray"></i> Unfit to minimum requirement</span></td>
                           </tr>
                           <tr>
                             <th class="text-greenish">Upload Speed</th>
-                            <td><span v-if="connectivitySettings.rtt < 500"><i class="fa fa-check-circle text-greenish"></i> Upload fits minimum requirement</span><span v-if="connectivitySettings.rtt >= 500"><i class="fa fa-minus-circle text-lightgray"></i> Unfit to minimum requirement</span></td>
+                            <td><span v-if="connectivitySettings.upload < 4"><i class="fa fa-check-circle text-greenish"></i> Upload fits minimum requirement</span><span v-if="connectivitySettings.rtt >= 4"><i class="fa fa-minus-circle text-lightgray"></i> Unfit to minimum requirement</span></td>
                           </tr>
                         </tbody>
                       </table>
@@ -292,11 +292,11 @@
                         <tbody>
                           <tr>
                             <th class="text-greenish">Download Speed</th>
-                            <td><span>{{connectivitySettings.download}}</span></td>
+                            <td><span>{{connectivitySettings.download}}Mb/s</span></td>
                           </tr>
                           <tr>
                             <th class="text-greenish">Upload Speed</th>
-                            <td><span>{{connectivitySettings.upload}}</span></td>
+                            <td><span>{{connectivitySettings.upload}}Mb/s</span></td>
                           </tr>
                           <tr>
                             <th class="text-greenish">Latency</th>
@@ -710,7 +710,7 @@
         <li class="left clearfix" v-for="chat in messages">
           <div class="chat-body clearfix">
             <div class="header">
-              <strong class="text-greenish">{{loggedInUser.identity===chat.user.identity ? 'Me' : chat.user.firstName}}</strong> : <span><strong>{{chat.message}}</strong></span><small class="text-muted ml-2"><span class="fa fa-clock"></span><moments-ago :date="chat.timestamp"></moments-ago></small>
+              <strong class="text-greenish">{{loggedInUser.identity===chat.user.identity ? 'Me' : chat.user.firstName}}</strong> : <span><strong>{{chat.message}}</strong></span>&nbsp;&nbsp;<small class="text-muted"><span class="fa fa-clock"></span><moments-ago :date="chat.timestamp"></moments-ago></small>
             </div>
           </div>
         </li>

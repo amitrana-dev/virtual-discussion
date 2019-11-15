@@ -3,6 +3,10 @@
 import Toasted from 'vue-toasted';
 import VueYouTubeEmbed from 'vue-youtube-embed';
 import JsBandwidth from "./jsbandwidth";
+import PdfMake from "pdfmake/build/pdfmake";
+import PdfFonts from "pdfmake/build/vfs_fonts";
+PdfMake.vfs = PdfFonts.pdfMake.vfs;
+var Ace = require('./ace/ace');
 (function () {
   var Vue = require('vue')
   Vue.use(Toasted)
@@ -87,8 +91,8 @@ import JsBandwidth from "./jsbandwidth";
           connected: false,
           rtt: navigator.connection.rtt,
           downlink: navigator.connection.downlink,
-          download: navigator.connection.downlink+'Mb/s',
-          upload: navigator.connection.downlink+'Mb/s',
+          download: navigator.connection.downlink,
+          upload: navigator.connection.downlink,
           latency: '0'
       },
       serverUrl: '',
@@ -734,14 +738,16 @@ import JsBandwidth from "./jsbandwidth";
             rightSideHeight=window.innerHeight- document.getElementById('play-menu').clientHeight;
           }
           // rightSideHeight= rightSideHeight < minHeight ? minHeight : rightSideHeight;
+          let playWidth=document.getElementById('content-block').clientWidth;
           document.querySelectorAll('.content-tabs').forEach(function (tab) {
             tab.style = 'height: ' + rightSideHeight + 'px'
             tab.querySelectorAll('canvas').forEach(function(canvas){
               canvas.setAttribute('height',rightSideHeight);
-              canvas.setAttribute('width',tab.clientWidth);
+              canvas.setAttribute('width',playWidth);
             })
           })
-          window.dispatchEvent(new Event('redraw'));
+          window.dispatchEvent(new Event('redraw'));  
+          
         })
       },
       addItem: function (itemType) {
@@ -794,13 +800,194 @@ import JsBandwidth from "./jsbandwidth";
           }
         };
       },
+      saveToPdf: function(){
+        let that=this;
+        Vue.toasted.info("Generating pdf from the content!",{position: 'bottom-right'}).goAway(3000);
+        new Promise((resolve,reject)=>{
+          let docDefinition={
+            styles: {
+              header: {
+                fontSize: 18,
+                bold: true
+              },
+              subheader: {
+                fontSize: 15,
+                bold: true
+              },
+              quote: {
+                italics: true
+              },
+              small: {
+                fontSize: 8
+              },
+              code: {
+                fontSize: 12,
+                italics: true
+              }
+            }
+          };
+          let docIndex=[];
+          let content=[
+            {text: that.course.title, style: 'header',alignment: 'center',margin: [0, 200]},
+            {text: 'Table of Content', style: 'header',alignment: 'center',pageBreak: 'before'},
+          ];
+          let contentPages=[  
+          ];
+          let mediaLinks=[];
+          let isMediaPresent=false;
+          that.contentTabs.forEach(function(tab){
+            if(['code','whiteboard','content'].indexOf(tab.type) !==-1){
+              docIndex.push({
+                text: [
+                        'Page #',
+                        { pageReference: tab.id },
+                        ': ',
+                        { textReference: tab.id }
+                      ]
+              });
+            }
+            if(['media','youtube'].indexOf(tab.type) !== -1){
+              if(!isMediaPresent) isMediaPresent=true;
+              mediaLinks.push({
+                text: tab.name+" : "+(tab.type=='youtube' ? 'https://www.youtube.com/watch?v='+tab.videoId : tab.url),
+                margin: [0,2]
+              })
+            }
+            switch(tab.type){
+              case 'whiteboard':
+                contentPages.push({
+                  text: tab.name,
+                  style: 'header',
+                  id: tab.id,
+                  pageBreak: 'before'
+                });
+                contentPages.push({
+                  image: document.querySelector('#'+tab.id+' .paint-canvas-local').toDataURL('image/png', 0.1),
+                  width: 800,
+                  height: 600,
+                  margin: [0,10]
+                });
+              break;
+              case 'content':
+                contentPages.push({
+                  text: tab.name,
+                  style: 'header',
+                  id: tab.id,
+                  pageBreak: 'before'
+                });
+                contentPages.push({
+                  image: document.querySelector('#'+tab.id+' .paint-canvas-local').toDataURL('image/png', 0.1),
+                  width: 800,
+                  height: 600,
+                  margin: [0,10]
+                });
+              break;
+              case 'code':
+                contentPages.push({
+                  text: tab.name,
+                  style: 'header',
+                  id: tab.id,
+                  pageBreak: 'before'
+                });
+                contentPages.push({
+                  text: Ace.edit(tab.id).getValue(),
+                  style: 'code',
+                  margin: [0,10]
+                });
+              break;
+            }
+          });
+          if(isMediaPresent){
+            docIndex.push({
+              text: [
+                      'Page #',
+                      { pageReference: 'media-list' },
+                      ': ',
+                      { textReference: 'media-list' }
+                    ]
+            });
+          }
+          docIndex.push({
+            text: [
+                    'Page #',
+                    { pageReference: 'chat-list' },
+                    ': ',
+                    { textReference: 'chat-list' }
+                  ]
+          });
+          content.push({
+            ul: docIndex
+          });
+          // add media to second last page
+          if(isMediaPresent){
+            contentPages.push({
+              text: 'Media',
+              style: 'header',
+              id: 'media-list',
+              pageBreak: 'before'
+            })
+                
+            contentPages.push({
+              ul: mediaLinks
+            })
+          }
+          // add chat to last page
+          let chats=[];
+          document.querySelectorAll('.chat-list li').forEach(function(li){  
+            chats.push(li.innerText);
+          });
+          contentPages.push({
+            text: 'Chat',
+            style: 'header',
+            id: 'chat-list',
+            pageBreak: 'before'
+          })
+          contentPages.push({
+            ul: chats
+          })
+          // combine intitial pages and content pages
+          content=content.concat(contentPages);
+
+          docDefinition.content = content;
+          resolve(docDefinition);
+        }).then(doc=>{
+          let pdf = PdfMake.createPdf(doc);
+          var saveData = (function () {
+              var a = document.createElement("a");
+              document.body.appendChild(a);
+              a.style = "display: none";
+              return function (blob, fileName) {
+                var url;
+                if(window.webkitURL){
+                  url=window.webkitURL;
+                }else if(window.URL && window.URL.createObjectURL){
+                  url=window.URL;
+                }else{
+                  console.log("Browser doesn't support generating object url");
+                  return false;
+                }
+                let href=url.createObjectURL(blob);
+                a.href = href;
+                a.download = fileName;
+                a.click();
+                url.revokeObjectURL(href);
+              };
+          }());
+          return pdf.getBlob(function(blob){
+            saveData(blob,'sample.pdf');
+          });
+        }).catch(function(err){
+          console.log(err);
+          Vue.toasted.error(err,{position: 'bottom-right'}).goAway(3000);
+        })
+      },
       exportTemplate: function() {
         this.toggleMenu();
         let exportingToast=Vue.toasted.info('Exporting template <div class="d-flex justify-content-center loader-container"><div class="lds-ripple"><div class="border-dark"></div><div class="border-dark"></div></div></div>',{position: 'bottom-right'});
         this.socket.emit('exporttemplate', function (err,fileBuffer) {
           exportingToast.goAway(0);
           if(err){
-            Vue.toasted.error('Export failed!').goAway(1500);
+            Vue.toasted.error('Export failed!',{position: 'bottom-right'}).goAway(1500);
             return;  
           }
           Vue.toasted.success('Export complete',{position: 'bottom-right',action: [
@@ -1050,8 +1237,8 @@ import JsBandwidth from "./jsbandwidth";
         
         let jsBandwidth=new JsBandwidth();
         jsBandwidth.testSpeed({latencyTestUrl: that.serverUrl+'/check',downloadUrl: that.serverUrl+'/check',uploadUrl: that.serverUrl+'/check'}).then(function(result){
-          that.connectivitySettings.download=(result.downloadSpeed < 0 || isNaN(result.downloadSpeed) ? result.downloadSpeed : Math.floor((result.downloadSpeed / 1000000) * 100) / 100)+'Mb/s';
-          that.connectivitySettings.upload=(result.uploadSpeed < 0 || isNaN(result.uploadSpeed) ? result.uploadSpeed : Math.floor((result.uploadSpeed / 1000000) * 100) / 100)+'Mb/s';
+          that.connectivitySettings.download=(result.downloadSpeed < 0 || isNaN(result.downloadSpeed) ? result.downloadSpeed : Math.floor((result.downloadSpeed / 1000000) * 100) / 100);
+          that.connectivitySettings.upload=(result.uploadSpeed < 0 || isNaN(result.uploadSpeed) ? result.uploadSpeed : Math.floor((result.uploadSpeed / 1000000) * 100) / 100);
           that.connectivitySettings.latency=result.latency;
         });
       }
