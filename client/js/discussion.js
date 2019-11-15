@@ -806,6 +806,10 @@ var Ace = require('./ace/ace');
         new Promise((resolve,reject)=>{
           let docDefinition={
             styles: {
+              intialheader: {
+                fontSize: 24,
+                bold: true
+              },
               header: {
                 fontSize: 18,
                 bold: true
@@ -828,7 +832,7 @@ var Ace = require('./ace/ace');
           };
           let docIndex=[];
           let content=[
-            {text: that.course.title, style: 'header',alignment: 'center',margin: [0, 200]},
+            {text: that.course.title, style: 'intialheader',alignment: 'center',margin: [0, 200]},
             {text: 'Table of Content', style: 'header',alignment: 'center',pageBreak: 'before'},
           ];
           let contentPages=[  
@@ -974,7 +978,7 @@ var Ace = require('./ace/ace');
               };
           }());
           return pdf.getBlob(function(blob){
-            saveData(blob,'sample.pdf');
+            saveData(blob,'Workspace.pdf');
           });
         }).catch(function(err){
           console.log(err);
