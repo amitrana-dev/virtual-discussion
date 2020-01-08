@@ -1,0 +1,6 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine on
+    RewriteRule ^node_modules/(.*)$ node_modules/$1 [L]
+    RewriteRule    ^$    client/    [L]
+    RewriteRule    (.*) client/$1    [L]
+</IfModule>
